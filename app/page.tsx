@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { query } from '@/lib/db';
+import { redis } from '@/lib/redis';
 import { Heart, Clock, User, Globe, Mail, MessageCircle, ChevronLeft } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
 import SearchInput from "@/components/SearchInput";
@@ -11,21 +13,64 @@ import AutoCarousel from "@/components/AutoCarousel";
 export const dynamic = 'force-dynamic';
 
 async function getData(searchQ?: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  // 1. Fetch campaigns directly
+  const cacheKeyCamp = searchQ ? `api:campaigns:search:${searchQ.toLowerCase()}` : `api:campaigns:all`;
+  let campaignsData = await redis.get(cacheKeyCamp);
   
-  const [campRes, catRes] = await Promise.all([
-    fetch(`${baseUrl}/api/campaigns${searchQ ? `?q=${encodeURIComponent(searchQ)}` : ''}`, { next: { revalidate: 60 } }),
-    fetch(`${baseUrl}/api/categories`, { next: { revalidate: 120 } })
-  ]);
-
-  if (!campRes.ok || !catRes.ok) {
-    throw new Error('Failed to fetch data');
+  if (!campaignsData) {
+    let text = `
+      SELECT c.*, 
+             cat.name as category_name,
+             COALESCE(cs.collected_amount, 0) as collected, 
+             COALESCE(cs.donor_count, 0) as donors
+      FROM campaigns c
+      LEFT JOIN campaign_stats cs ON c.id = cs.campaign_id
+      LEFT JOIN categories cat ON c.category_id = cat.id
+      WHERE c.status = 'ACTIVE'
+    `;
+    const params: any[] = [];
+    if (searchQ) {
+      text += ` AND (c.title ILIKE $1 OR cat.name ILIKE $1)`;
+      params.push(`%${searchQ}%`);
+    }
+    text += ` ORDER BY c.sort ASC, c.created_at DESC`;
+    const rawCampaigns = await query(text, params);
+    
+    const processed = rawCampaigns.map(c => {
+      let daysLeft = 0;
+      if (c.end_date) {
+        const diff = new Date(c.end_date).getTime() - new Date().getTime();
+        daysLeft = Math.max(0, Math.ceil(diff / (1000 * 3600 * 24)));
+      }
+      return {
+        ...c,
+        daysLeft,
+        progress: c.has_no_target ? 0 : Math.min(100, Math.round(((Number(c.collected) || 0) / (Number(c.target_amount) || 1)) * 100))
+      };
+    });
+    const payload = { data: processed };
+    await redis.set(cacheKeyCamp, JSON.stringify(payload), { ex: 60 });
+    campaignsData = payload as any;
+  } else if (typeof campaignsData === 'string') {
+    campaignsData = JSON.parse(campaignsData) as any;
   }
 
-  const campaignsData = await campRes.json();
-  const categoriesData = await catRes.json();
+  // 2. Fetch categories directly
+  const cacheKeyCat = `api:categories:all`;
+  let categoriesData = await redis.get(cacheKeyCat);
+  if (!categoriesData) {
+    const cats = await query(`SELECT * FROM categories WHERE is_active = true ORDER BY id ASC`);
+    const payload = { data: cats };
+    await redis.set(cacheKeyCat, JSON.stringify(payload), { ex: 120 });
+    categoriesData = payload as any;
+  } else if (typeof categoriesData === 'string') {
+    categoriesData = JSON.parse(categoriesData) as any;
+  }
 
-  return { campaigns: campaignsData.data, categories: categoriesData.data };
+  return { 
+    campaigns: (campaignsData as any).data || [], 
+    categories: (categoriesData as any).data || [] 
+  };
 }
 
 export default async function Home(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
