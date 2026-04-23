@@ -3,9 +3,46 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
+import type { Metadata } from "next";
+export async function generateMetadata(
+  props: { params: Promise<{ slug: string }> }
+): Promise<Metadata> {
+  const params = await props.params;
+  const campaign = await getCampaignDetail(params.slug);
 
-export const dynamic = 'force-dynamic';
+  if (!campaign) {
+    return {
+      title: 'Kampanye Tidak Ditemukan',
+    };
+  }
 
+  const title = campaign.title;
+  const description = campaign.description || `Mari bersama wujudkan kebaikan melalui kampanye ${campaign.title}`;
+  const imageUrl = campaign.image_url || '/placeholder.jpg';
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [imageUrl],
+    },
+  };
+}
 async function getCampaignDetail(slug: string) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const res = await fetch(`${baseUrl}/api/campaigns/${slug}`, { next: { revalidate: 60 } });

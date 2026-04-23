@@ -10,7 +10,6 @@ import CategoryGrid from "@/components/CategoryGrid";
 import Header from "@/components/layout/Header";
 import AutoCarousel from "@/components/AutoCarousel";
 
-export const dynamic = 'force-dynamic';
 
 async function getData(searchQ?: string) {
   // 1. Fetch campaigns directly

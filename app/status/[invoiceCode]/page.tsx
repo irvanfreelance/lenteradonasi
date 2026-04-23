@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Clock, CheckCircle2, ChevronRight, HelpCircle } from 'lucide-react';
 import { query } from '@/lib/db';
 import { notFound } from 'next/navigation';
+import Script from 'next/script';
 
 export const revalidate = 0;
 
@@ -10,7 +11,7 @@ async function getInvoiceStatus(invoiceCode: string) {
     return { status: 'PENDING' };
   }
 
-  const invoices = await query('SELECT status FROM invoices WHERE invoice_code = $1', [invoiceCode]);
+  const invoices = await query('SELECT status, total_amount, invoice_code FROM invoices WHERE invoice_code = $1', [invoiceCode]);
   if (invoices.length === 0) return null;
   return invoices[0];
 }
@@ -24,6 +25,41 @@ export default async function StatusPage(props: { params: Promise<{ invoiceCode:
   // For simulation, we assume manual transfer means it is waiting for admin validation.
   // Real logic would also check if status === 'PENDING' vs 'PAID'.
   
+  if (invoice.status === 'PAID') {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50">
+        <Script
+          id="purchase-event"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined') {
+                if (window.fbq) window.fbq('track', 'Purchase', { value: ${invoice.total_amount || 0}, currency: 'IDR' });
+                if (window.ttq) window.ttq.track('CompletePayment', { value: ${invoice.total_amount || 0}, currency: 'IDR' });
+                if (window.gtag) window.gtag('event', 'purchase', { transaction_id: '${invoice.invoice_code}', value: ${invoice.total_amount || 0}, currency: 'IDR' });
+              }
+            `
+          }}
+        />
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div className="relative mb-8">
+            <div className="absolute inset-0 bg-teal-400 rounded-full animate-ping opacity-20"></div>
+            <div className="w-24 h-24 bg-gradient-to-br from-teal-50 to-teal-100 border-4 border-white shadow-xl rounded-full flex items-center justify-center relative z-10">
+              <CheckCircle2 size={48} className="text-teal-600" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-extrabold text-gray-800 mb-3">Alhamdulillah!</h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed max-w-[280px]">
+            Donasi Anda sebesar <span className="font-bold text-gray-800">Rp {Number(invoice.total_amount).toLocaleString('id-ID')}</span> telah berhasil kami terima. Terima kasih orang baik!
+          </p>
+          <Link href="/" className="w-full bg-teal-600 text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-teal-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+            Kembali ke Beranda
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">

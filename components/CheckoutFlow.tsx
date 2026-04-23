@@ -64,13 +64,55 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
   const submitDonation = async () => {
     setLoading(true);
 
-    // Simulated Checkout Flow
-    setTimeout(() => {
+    // Tracking Event
+    if (typeof window !== 'undefined') {
+      if ((window as any).fbq) (window as any).fbq('track', 'InitiateCheckout');
+      if ((window as any).ttq) (window as any).ttq.track('InitiateCheckout');
+      if ((window as any).gtag) (window as any).gtag('event', 'begin_checkout', { value: currentTotalAmount, currency: 'IDR' });
+    }
+
+    try {
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(';').shift();
+        return undefined;
+      };
+
+      const payload = {
+        campaignId: campaign.id,
+        amount: currentTotalAmount,
+        donorName: donationData.name.trim() || (donationData.isAnonymous ? 'Hamba Allah' : 'Anonim'),
+        donorEmail: donationData.email || null,
+        isAnonymous: donationData.isAnonymous,
+        paymentMethodId: donationData.paymentMethod.id,
+        paymentType: donationData.paymentMethod.code,
+        qty: donationMode === 'package' ? packageQty : 1,
+        qurbanNames: donationData.qurbanNames,
+        fbClickId: getCookie('fbclid') || null,
+        fbBrowserId: getCookie('_fbp') || null,
+        tiktokClickId: getCookie('ttclid') || null,
+        googleClickId: getCookie('gclid') || null
+      };
+
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (data.status === 'success') {
+        router.push(`/invoice/${data.data.invoice_code}`);
+      } else {
+        alert(data.message || 'Gagal membuat invoice');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan sistem');
+    } finally {
       setLoading(false);
-      const isManual = donationData.paymentMethod?.code?.includes('MANUAL');
-      const invoiceSimCode = isManual ? `SIM-MANUAL-${donationData.amount}` : `SIM-${donationData.amount}`;
-      router.push(`/invoice/${invoiceSimCode}`);
-    }, 1000);
+    }
   };
 
   const CampaignSummaryCard = () => (

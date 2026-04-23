@@ -13,13 +13,20 @@ const checkoutSchema = z.object({
   paymentMethodId: z.number(),
   paymentType: z.string(),
   qty: z.number().default(1),
-  qurbanNames: z.array(z.string()).optional()
+  qurbanNames: z.array(z.string()).optional(),
+  fbClickId: z.string().optional().nullable(),
+  fbBrowserId: z.string().optional().nullable(),
+  tiktokClickId: z.string().optional().nullable(),
+  googleClickId: z.string().optional().nullable()
 });
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const parsed = checkoutSchema.parse(body);
+
+    const clientIpAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'Unknown';
+    const clientUserAgent = req.headers.get('user-agent') || 'Unknown';
 
     // 1. Fetch Payment Method for admin fee calculations
     const pmResult = await query(`SELECT * FROM payment_methods WHERE id = $1`, [parsed.paymentMethodId]);
@@ -68,12 +75,14 @@ export async function POST(req: Request) {
     const insertInvoice = await query(`
       INSERT INTO invoices (
         invoice_code, payment_method_id, donor_name_snapshot, donor_email, is_anonymous, 
-        base_amount, admin_fee, total_amount, status, payment_url, va_number
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        base_amount, admin_fee, total_amount, status, payment_url, va_number,
+        fb_click_id, fb_browser_id, tiktok_click_id, google_click_id, client_ip_address, client_user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING id, created_at
     `, [
       invoiceCode, parsed.paymentMethodId, parsed.donorName, parsed.donorEmail || null, parsed.isAnonymous,
-      parsed.amount, adminFee, totalAmount, 'PENDING', paymentUrl, externalVa
+      parsed.amount, adminFee, totalAmount, 'PENDING', paymentUrl, externalVa,
+      parsed.fbClickId || null, parsed.fbBrowserId || null, parsed.tiktokClickId || null, parsed.googleClickId || null, clientIpAddress, clientUserAgent
     ]);
 
     const invoiceId = insertInvoice[0].id;
