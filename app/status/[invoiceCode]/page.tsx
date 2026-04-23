@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { Clock, CheckCircle2, ChevronRight, HelpCircle } from 'lucide-react';
+import { Clock, CheckCircle2, ChevronRight, HelpCircle, HeartHandshake, Share2, ReceiptText } from 'lucide-react';
 import { query } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Script from 'next/script';
+import { formatIDR } from '@/lib/utils';
 
 export const revalidate = 0;
 
@@ -11,7 +12,14 @@ async function getInvoiceStatus(invoiceCode: string) {
     return { status: 'PENDING' };
   }
 
-  const invoices = await query('SELECT status, total_amount, invoice_code FROM invoices WHERE invoice_code = $1', [invoiceCode]);
+  const invoices = await query(`
+    SELECT i.status, i.total_amount, i.invoice_code, i.created_at, pm.name as payment_method_name, c.title as campaign_title
+    FROM invoices i
+    LEFT JOIN transactions t ON i.id = t.invoice_id
+    LEFT JOIN campaigns c ON t.campaign_id = c.id
+    LEFT JOIN payment_methods pm ON i.payment_method_id = pm.id
+    WHERE i.invoice_code = $1
+  `, [invoiceCode]);
   if (invoices.length === 0) return null;
   return invoices[0];
 }
@@ -41,20 +49,62 @@ export default async function StatusPage(props: { params: Promise<{ invoiceCode:
             `
           }}
         />
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="relative mb-8">
+        <div className="flex-1 flex flex-col items-center p-6 text-center w-full max-w-md mx-auto">
+          {/* Header Celebration */}
+          <div className="relative mb-6 mt-4">
             <div className="absolute inset-0 bg-teal-400 rounded-full animate-ping opacity-20"></div>
-            <div className="w-24 h-24 bg-gradient-to-br from-teal-50 to-teal-100 border-4 border-white shadow-xl rounded-full flex items-center justify-center relative z-10">
-              <CheckCircle2 size={48} className="text-teal-600" />
+            <div className="w-20 h-20 bg-gradient-to-br from-teal-50 to-teal-100 border-4 border-white shadow-xl rounded-full flex items-center justify-center relative z-10 mx-auto">
+              <CheckCircle2 size={40} className="text-teal-600" />
             </div>
           </div>
-          <h1 className="text-2xl font-extrabold text-gray-800 mb-3">Alhamdulillah!</h1>
-          <p className="text-gray-500 text-sm mb-8 leading-relaxed max-w-[280px]">
-            Donasi Anda sebesar <span className="font-bold text-gray-800">Rp {Number(invoice.total_amount).toLocaleString('id-ID')}</span> telah berhasil kami terima. Terima kasih orang baik!
+          <h1 className="text-2xl font-extrabold text-gray-800 mb-2">Alhamdulillah!</h1>
+          <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+            Donasi Anda telah berhasil diverifikasi.
           </p>
-          <Link href="/" className="w-full bg-teal-600 text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-teal-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-            Kembali ke Beranda
+
+          {/* Receipt Card */}
+          <div className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8 text-left relative">
+             <div className="bg-teal-50/50 p-4 border-b border-teal-100/50 flex justify-between items-center">
+               <span className="text-teal-800 font-bold text-sm flex items-center gap-2"><ReceiptText size={16}/> Bukti Donasi</span>
+               <span className="text-[10px] bg-teal-100 text-teal-700 font-bold px-2 py-1 rounded-md uppercase">BERHASIL</span>
+             </div>
+             <div className="p-5 space-y-4">
+               <div>
+                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Nominal Donasi</p>
+                 <p className="text-2xl font-extrabold text-teal-600">{formatIDR(Number(invoice.total_amount))}</p>
+               </div>
+               
+               <div className="w-full h-px bg-dashed bg-gray-200"></div>
+               
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">ID Transaksi</p>
+                   <p className="text-xs font-bold text-gray-800">{invoice.invoice_code}</p>
+                 </div>
+                 <div>
+                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Metode Bayar</p>
+                   <p className="text-xs font-bold text-gray-800">{invoice.payment_method_name || 'E-Wallet / Transfer'}</p>
+                 </div>
+                 <div className="col-span-2">
+                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Program Kebaikan</p>
+                   <p className="text-xs font-bold text-gray-800 leading-snug">{invoice.campaign_title || 'Donasi Umum'}</p>
+                 </div>
+               </div>
+             </div>
+             {/* Zigzag bottom border effect */}
+             <div className="absolute bottom-0 left-0 right-0 h-2 bg-repeat-x flex">
+               {Array.from({ length: 20 }).map((_, i) => (
+                 <div key={i} className="w-3 h-3 bg-slate-50 rotate-45 transform origin-bottom -mb-1.5 shadow-[inset_0_1px_1px_rgba(0,0,0,0.02)]"></div>
+               ))}
+             </div>
+          </div>
+
+          <Link href="/" className="w-full bg-teal-600 text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-teal-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-3">
+            Selesai
           </Link>
+          <button className="w-full bg-white text-teal-600 border border-teal-200 font-bold text-sm py-4 rounded-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+            <Share2 size={16} /> Bagikan Kebaikan Ini
+          </button>
         </div>
       </div>
     );
