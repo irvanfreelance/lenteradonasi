@@ -12,7 +12,7 @@ export async function GET() {
     }
 
     const pm = await query(`
-      SELECT * FROM payment_methods WHERE is_active = true ORDER BY id ASC
+      SELECT * FROM payment_methods WHERE is_active = true ORDER BY sort_order ASC, id ASC
     `);
 
     const response = { status: 'success', data: pm };

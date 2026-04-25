@@ -62,11 +62,26 @@ export default function CheckoutPayment({ campaign, paymentMethods }: any) {
     }
   }, [loaded, checkoutData, campaign.slug, router]);
 
-  const groupPayments = paymentMethods?.reduce((acc: any, curr: any) => {
-    if (!acc[curr.type]) acc[curr.type] = [];
-    acc[curr.type].push(curr);
-    return acc;
-  }, {});
+  const groupedArray: { type: string; methods: any[] }[] = [];
+  const groupedMap = new Map();
+
+  paymentMethods?.forEach((pm: any) => {
+    if (!groupedMap.has(pm.type)) {
+      const groupObj = { type: pm.type, methods: [] };
+      groupedMap.set(pm.type, groupObj);
+      groupedArray.push(groupObj);
+    }
+    groupedMap.get(pm.type).methods.push(pm);
+  });
+
+  const typeInfo: Record<string, { title: string, subtitle: string }> = {
+    'qr_code': { title: 'QRIS', subtitle: '(Minimal Transaksi 1.000) *Dicek Otomatis' },
+    'va': { title: 'Bank Transfer Otomatis', subtitle: '(Minimal Transaksi 10.000) *Dicek Otomatis' },
+    'e_wallet': { title: 'eWallet', subtitle: '(Minimal Transaksi 1.000) *Dicek Otomatis' },
+    'retail_outlet': { title: 'Gerai Retail / Minimarket', subtitle: '(Minimal Transaksi 10.000) *Dicek Otomatis' },
+    'manual_transfer': { title: 'Transfer Manual', subtitle: '(Minimal Transaksi 10.000) *Dicek Manual' },
+    'manual': { title: 'Transfer Manual', subtitle: '(Minimal Transaksi 10.000) *Dicek Manual' }
+  };
 
   const currentTotalAmount = checkoutData.amount || 0;
 
@@ -145,28 +160,48 @@ export default function CheckoutPayment({ campaign, paymentMethods }: any) {
             <p className="text-teal-800 font-extrabold text-lg">{formatIDR(currentTotalAmount)}</p>
           </div>
 
-          {Object.entries(groupPayments || {}).map(([type, methods]: any, idx) => (
-            <div key={idx} className="mb-6">
-              <h3 className="font-bold text-[11px] text-gray-800 mb-3 uppercase tracking-wider">{typeLabels[type] || type}</h3>
+          {groupedArray.map((group: any, idx) => {
+            const info = typeInfo[group.type] || { title: group.type, subtitle: '' };
+            const previewText = group.methods.map((m: any) => m.name).join(', ');
+            const hasSelectedMethod = group.methods.some((m: any) => m.id === selectedPayment?.id);
+            
+            return (
+              <details 
+                key={idx} 
+                name="payment-accordion"
+                className="group bg-white rounded-xl shadow-sm border border-gray-100 mb-3 overflow-hidden" 
+                open={hasSelectedMethod}
+              >
+                <summary className="p-3.5 cursor-pointer list-none flex justify-between items-center select-none bg-white hover:bg-gray-50/50 transition-colors">
+                  <div className="flex flex-col gap-0.5 pr-4">
+                    <h3 className="font-bold text-[15px] text-gray-900 leading-tight">{info.title}</h3>
+                    {info.subtitle && <p className="text-[11px] text-gray-500">{info.subtitle}</p>}
+                    <p className="text-[11px] text-orange-600 font-medium truncate mt-0.5" style={{ maxWidth: '240px' }}>
+                      {previewText}
+                    </p>
+                  </div>
+                  <ChevronLeft size={18} className="text-gray-400 group-open:-rotate-90 rotate-180 transition-transform shrink-0" />
+                </summary>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                {methods.map((m: any, mIdx: number) => {
-                  const isSelected = selectedPayment?.id === m.id;
-                  return (
-                    <div key={m.id} onClick={() => setSelectedPayment(m)} className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${mIdx !== methods.length - 1 ? 'border-b border-gray-100' : ''} bg-white hover:bg-slate-50`}>
-                      <div className="flex items-center gap-4">
-                        {m.logo_url ? <img src={m.logo_url} className="w-8 h-8 object-contain" /> : <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center"><Banknote size={16} className="text-gray-400" /></div>}
-                        <span className="font-bold text-sm text-gray-800">{m.name}</span>
+                <div className="border-t border-gray-100 bg-slate-50/50">
+                  {group.methods.map((m: any, mIdx: number) => {
+                    const isSelected = selectedPayment?.id === m.id;
+                    return (
+                      <div key={m.id} onClick={() => setSelectedPayment(m)} className={`p-3.5 flex items-center justify-between cursor-pointer transition-colors ${mIdx !== group.methods.length - 1 ? 'border-b border-gray-100' : ''} bg-white hover:bg-teal-50/30`}>
+                        <div className="flex items-center gap-3">
+                          {m.logo_url ? <img src={m.logo_url} className="w-7 h-7 object-contain" /> : <div className="w-7 h-7 bg-gray-100 rounded-md flex items-center justify-center"><Banknote size={14} className="text-gray-400" /></div>}
+                          <span className="font-bold text-[13px] text-gray-800">{m.name}</span>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'border-teal-500 bg-teal-500' : 'border-gray-300'}`}>
+                           {isSelected && <Check size={12} strokeWidth={4} className="text-white" />}
+                        </div>
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'border-teal-500 bg-teal-500' : 'border-gray-300'}`}>
-                         {isSelected && <Check size={14} strokeWidth={4} className="text-white" />}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          })}
         </div>
         <div className="absolute bottom-0 w-full bg-white p-4 border-t border-gray-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] text-center">
            <button onClick={submitDonation} disabled={!selectedPayment || loading} className="w-full bg-teal-600 text-white font-bold text-lg py-4 rounded-xl disabled:bg-gray-300 active:scale-[0.98] transition-transform">
