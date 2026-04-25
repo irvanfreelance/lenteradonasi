@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { redis } from '@/lib/redis';
+import { Client } from "@upstash/workflow";
 
 export async function POST(req: Request) {
   try {
@@ -58,8 +60,57 @@ export async function POST(req: Request) {
       VALUES ($1, $2, $3, $4, $5)
     `, [invoiceCode, `/api/webhooks/xendit${event ? `:${event}` : ''}`, JSON.stringify(payload), JSON.stringify(responsePayload), 200]);
 
-    // Trigger QStash for WhatsApp Paid Notification
+    // REAL-TIME UPDATES & WORKFLOW
     if (newStatus === 'PAID') {
+      try {
+        // 1. Fetch details for Redis & Workflow
+        const invoiceDetails = await query(`
+          SELECT i.id, i.total_amount, i.donor_name_snapshot, i.is_anonymous, i.doa, t.campaign_id, c.slug
+          FROM invoices i
+          JOIN transactions t ON i.id = t.invoice_id AND i.created_at = t.invoice_created_at
+          JOIN campaigns c ON t.campaign_id = c.id
+          WHERE i.invoice_code = $1
+          LIMIT 1
+        `, [invoiceCode]);
+
+        if (invoiceDetails.length > 0) {
+          const detail = invoiceDetails[0];
+          const { campaign_id, total_amount, donor_name_snapshot, is_anonymous, doa, slug } = detail;
+
+          // 2. Immediate Redis Update (Stats)
+          const statsKey = `campaign:${campaign_id}:stats`;
+          await redis.hincrby(statsKey, 'collected_amount', Math.round(Number(total_amount)));
+          await redis.hincrby(statsKey, 'donor_count', 1);
+
+          // 3. Immediate Redis Update (Donor List)
+          const donorListKey = `campaign:${campaign_id}:donors`;
+          const donorData = JSON.stringify({
+            id: detail.id,
+            name: is_anonymous ? 'Hamba Allah' : donor_name_snapshot,
+            amount: Number(total_amount),
+            date: new Date().toISOString(),
+            message: doa
+          });
+          await redis.lpush(donorListKey, donorData);
+          await redis.ltrim(donorListKey, 0, 99); // Keep last 100
+
+          // 4. Trigger Upstash Workflow for DB Sync
+          const workflowClient = new Client({ token: process.env.QSTASH_TOKEN! });
+          await workflowClient.trigger({
+            url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/workflow/payment-success`,
+            body: {
+              campaignId: campaign_id,
+              amount: Number(total_amount),
+              invoiceCode,
+              slug
+            },
+          });
+        }
+      } catch (redisErr) {
+        console.error("Redis/Workflow update error:", redisErr);
+      }
+
+      // Existing QStash logic for WA (optional, kept for compatibility)
       try {
         const qstashUrl = process.env.QSTASH_URL;
         const qstashToken = process.env.QSTASH_TOKEN;

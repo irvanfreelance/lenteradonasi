@@ -47,6 +47,7 @@ async function getInvoice(invoiceCode: string) {
       i.status, 
       i.payment_url,
       i.created_at,
+      i.doa,
       pm.id as payment_method_id,
       pm.name as payment_method_name,
       pm.type as payment_method_type,

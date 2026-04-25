@@ -34,32 +34,45 @@ export default function CheckoutPayment({ campaign, paymentMethods }: any) {
     }
   }, [checkoutData.amount]);
 
-  // Load from localStorage
+  // Load from localStorage & Handle Selection
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         setCheckoutData(parsed);
+        
         const donorSaved = localStorage.getItem('lenteradonasi_donor_data');
-        if (donorSaved) {
+        if (donorSaved && paymentMethods && paymentMethods.length > 0) {
           const donorParsed = JSON.parse(donorSaved);
-          if (donorParsed.paymentMethodId && paymentMethods) {
+          
+          // Try to restore previous selection
+          if (donorParsed.paymentMethodId) {
             const found = paymentMethods.find((pm: any) => pm.id === donorParsed.paymentMethodId);
             if (found) {
               setSelectedPayment(found);
               setActiveCategory(found.type);
-              // Has a previous selection: start in compact mode
               setIsChangingPayment(false);
+              setLoaded(true);
+              return;
             }
           }
+          
+          // If no previous selection OR restoration failed, but we have methods, set default
+          if (!activeCategory && !selectedPayment) {
+            setActiveCategory(paymentMethods[0].type);
+            setIsChangingPayment(true);
+          }
+          setLoaded(true);
         }
       } catch (e) {
         console.error('Failed to parse checkout data', e);
+        setLoaded(true);
       }
+    } else {
+      setLoaded(true);
     }
-    setLoaded(true);
-  }, [paymentMethods]);
+  }, [paymentMethods, LS_KEY]);
 
   // Redirect if no checkout data
   useEffect(() => {
@@ -80,12 +93,7 @@ export default function CheckoutPayment({ campaign, paymentMethods }: any) {
     groupedMap.get(pm.type).methods.push(pm);
   });
 
-  useEffect(() => {
-    if (groupedArray.length > 0 && !activeCategory && !selectedPayment) {
-      setActiveCategory(groupedArray[0].type);
-      setIsChangingPayment(true);
-    }
-  }, [groupedArray.length, activeCategory, selectedPayment]);
+  // Removed redundant default selection effect as it's now handled above
 
   const typeInfo: Record<string, { title: string, subtitle: string }> = {
     'qr_code': { title: 'QRIS', subtitle: '(Minimal Transaksi 1.000) *Dicek Otomatis' },
@@ -124,6 +132,7 @@ export default function CheckoutPayment({ campaign, paymentMethods }: any) {
         donorEmail: checkoutData.donorEmail || null,
         donorPhone: checkoutData.donorPhone || null,
         isAnonymous: checkoutData.isAnonymous,
+        doa: checkoutData.doa || null,
         paymentMethodId: selectedPayment.id,
         paymentType: selectedPayment.code,
         qty: checkoutData.donationMode === 'package' ? checkoutData.packageQty : 1,
@@ -178,7 +187,7 @@ export default function CheckoutPayment({ campaign, paymentMethods }: any) {
             <h3 className="font-bold text-gray-800 mb-3 text-sm px-1">Rincian Pembayaran</h3>
             <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                <div className="flex flex-col gap-3 pb-3 border-b border-dashed border-gray-200">
-                 {campaign.bundleItems && checkoutData.donationMode === 'package' ? (
+                 {campaign.bundleItems && campaign.bundleItems.length > 0 && checkoutData.donationMode === 'package' ? (
                    campaign.bundleItems.map((item: any, idx: number) => (
                      <div key={idx} className="flex justify-between items-center">
                        <span className="text-gray-600 text-[13px] font-medium">{item.name} (x{item.qty * checkoutData.packageQty})</span>

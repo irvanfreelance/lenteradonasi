@@ -11,7 +11,18 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     const cached = await redis.get(cacheKey);
     
     if (cached) {
-      return NextResponse.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+      const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
+      // Merge real-time stats from Redis even if main data is cached
+      const statsKey = `campaign:${data.data.id}:stats`;
+      const rtStats = await redis.hgetall(statsKey) as Record<string, string> | null;
+      
+      if (rtStats) {
+        data.data.collected = rtStats.collected_amount ? Number(rtStats.collected_amount) : data.data.collected;
+        data.data.donors = rtStats.donor_count ? Number(rtStats.donor_count) : data.data.donors;
+        data.data.progress = data.data.has_no_target ? 0 : Math.min(100, Math.round(((Number(data.data.collected) || 0) / (Number(data.data.target_amount) || 1)) * 100));
+      }
+      
+      return NextResponse.json(data);
     }
 
     const campaigns = await query(`
@@ -56,10 +67,19 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     const ngoConfigs = await query(`SELECT ngo_name FROM ngo_configs LIMIT 1`);
     const ngoName = ngoConfigs.length > 0 ? ngoConfigs[0].ngo_name : 'Lembaga Kami';
 
+    // 2. Fetch Real-time Stats from Redis
+    const statsKey = `campaign:${c.id}:stats`;
+    const rtStats = await redis.hgetall(statsKey) as Record<string, string> | null;
+    
+    const collected = rtStats?.collected_amount ? Number(rtStats.collected_amount) : Number(c.collected);
+    const donors = rtStats?.donor_count ? Number(rtStats.donor_count) : Number(c.donors);
+
     const data = {
       ...c,
+      collected,
+      donors,
       daysLeft,
-      progress: c.has_no_target ? 0 : Math.min(100, Math.round(((Number(c.collected) || 0) / (Number(c.target_amount) || 1)) * 100)),
+      progress: c.has_no_target ? 0 : Math.min(100, Math.round(((collected || 0) / (Number(c.target_amount) || 1)) * 100)),
       updates,
       variants,
       bundleItems,

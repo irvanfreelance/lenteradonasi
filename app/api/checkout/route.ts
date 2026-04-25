@@ -13,6 +13,7 @@ const checkoutSchema = z.object({
   donorEmail: z.string().optional().nullable(),
   donorPhone: z.string().optional().nullable(),
   isAnonymous: z.boolean(),
+  doa: z.string().optional().nullable(),
   paymentMethodId: z.coerce.number(),
   paymentType: z.string(),
   qty: z.coerce.number().default(1),
@@ -203,15 +204,15 @@ export async function POST(req: Request) {
     // 6. Insert to Main DB Tables first to generate ID
     const insertInvoice = await query(`
       INSERT INTO invoices (
-        invoice_code, payment_method_id, donor_id, donor_name_snapshot, donor_email, donor_phone, is_anonymous, 
+        invoice_code, payment_method_id, donor_id, donor_name_snapshot, donor_email, donor_phone, is_anonymous, doa,
         base_amount, admin_fee, total_amount, status, payment_url, va_number,
         xendit_payment_request_id,
         fb_click_id, fb_browser_id, tiktok_click_id, google_click_id, client_ip_address, client_user_agent,
         created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING id, created_at
     `, [
-      invoiceCode, parsed.paymentMethodId, donorId, name, email, phone, parsed.isAnonymous,
+      invoiceCode, parsed.paymentMethodId, donorId, name, email, phone, parsed.isAnonymous, parsed.doa || null,
       parsed.amount, adminFee, totalAmount, 'PENDING', paymentUrl, externalVa,
       xenditPaymentRequestId,
       parsed.fbClickId || null, parsed.fbBrowserId || null, parsed.tiktokClickId || null, parsed.googleClickId || null, clientIpAddress, clientUserAgent,
@@ -224,14 +225,14 @@ export async function POST(req: Request) {
     // Duplicate to Partition Table
     await query(`
       INSERT INTO "${invoiceTable}" (
-        id, invoice_code, payment_method_id, donor_id, donor_name_snapshot, donor_email, donor_phone, is_anonymous, 
+        id, invoice_code, payment_method_id, donor_id, donor_name_snapshot, donor_email, donor_phone, is_anonymous, doa,
         base_amount, admin_fee, total_amount, status, payment_url, va_number,
         xendit_payment_request_id,
         fb_click_id, fb_browser_id, tiktok_click_id, google_click_id, client_ip_address, client_user_agent,
         created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
     `, [
-      invoiceId, invoiceCode, parsed.paymentMethodId, donorId, name, email, phone, parsed.isAnonymous,
+      invoiceId, invoiceCode, parsed.paymentMethodId, donorId, name, email, phone, parsed.isAnonymous, parsed.doa || null,
       parsed.amount, adminFee, totalAmount, 'PENDING', paymentUrl, externalVa,
       xenditPaymentRequestId,
       parsed.fbClickId || null, parsed.fbBrowserId || null, parsed.tiktokClickId || null, parsed.googleClickId || null, clientIpAddress, clientUserAgent,

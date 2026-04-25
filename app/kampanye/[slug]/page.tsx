@@ -4,6 +4,7 @@ import CheckoutButton from "@/components/CheckoutButton";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
+import DonorsTab from "@/components/DonorsTab";
 import type { Metadata } from "next";
 export async function generateMetadata(
   props: { params: Promise<{ slug: string }> }
@@ -64,7 +65,7 @@ export default async function CampaignDetail(props: { params: Promise<{ slug: st
     notFound();
   }
 
-  const detailTab = searchParams?.tab === 'info' ? 'info' : 'cerita';
+  const detailTab = searchParams?.tab || 'cerita';
   
   let btnLabel = "Donasi Sekarang";
   if (campaign.is_zakat) btnLabel = "Tunaikan Zakat";
@@ -113,6 +114,10 @@ export default async function CampaignDetail(props: { params: Promise<{ slug: st
             Info Terbaru
             {detailTab === 'info' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-teal-500 rounded-t-full"></div>}
           </Link>
+          <Link href={`?tab=donatur`} replace scroll={false} className={`pb-3 flex-1 font-bold text-sm text-center transition-all relative ${detailTab === 'donatur' ? 'text-teal-600' : 'text-gray-400 hover:text-gray-600'}`}>
+            Donatur
+            {detailTab === 'donatur' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-teal-500 rounded-t-full"></div>}
+          </Link>
         </div>
 
         {/* Tab Content: Cerita */}
@@ -158,6 +163,10 @@ export default async function CampaignDetail(props: { params: Promise<{ slug: st
               </div>
             )}
           </div>
+        )}
+        {/* Tab Content: Donatur (Infinite Scroll) */}
+        {detailTab === 'donatur' && (
+          <DonorsTab slug={params.slug} />
         )}
       </div>
 

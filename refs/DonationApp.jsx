@@ -1207,7 +1207,7 @@ export default function App() {
             </div>
           </div>
 
-          <h3 className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wide">Data Diri Pembayar</h3>
+          <h3 className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wide">Profil Donatur</h3>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Lengkap</label>
