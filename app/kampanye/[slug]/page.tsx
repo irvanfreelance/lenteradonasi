@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import CheckoutButton from "@/components/CheckoutButton";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
@@ -161,9 +162,7 @@ export default async function CampaignDetail(props: { params: Promise<{ slug: st
       </div>
 
       <div className="sticky bottom-0 w-full bg-white/95 backdrop-blur-sm p-4 pb-6 border-t border-gray-100 z-30">
-        <Link href={`/kampanye/${campaign.slug}/checkout`} className="w-full block text-center bg-teal-600 text-white font-bold text-lg py-4 rounded-2xl shadow-lg shadow-teal-600/20 active:scale-[0.98] transition-transform">
-          {btnLabel}
-        </Link>
+        <CheckoutButton href={`/kampanye/${campaign.slug}/checkout`} label={btnLabel} />
       </div>
     </div>
   );

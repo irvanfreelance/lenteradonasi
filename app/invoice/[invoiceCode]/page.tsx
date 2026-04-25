@@ -38,11 +38,15 @@ async function getInvoice(invoiceCode: string) {
 
   const invoices = await query(`
     SELECT 
+      i.id,
       i.invoice_code,
+      i.base_amount,
+      i.admin_fee,
       i.total_amount, 
       i.va_number, 
       i.status, 
       i.payment_url,
+      i.created_at,
       pm.id as payment_method_id,
       pm.name as payment_method_name,
       pm.type as payment_method_type,
@@ -65,7 +69,29 @@ async function getInvoice(invoiceCode: string) {
     ORDER BY sort_order ASC
   `, [invoice.payment_method_id]);
 
-  return { ...invoice, instructions };
+  // Determine transaction table
+  let transactionTable = 'transactions';
+  if (dateMatch) {
+    const suffix = `y${dateMatch[1]}m${dateMatch[2]}`;
+    const tableName = `transactions_${suffix}`;
+    const tableCheck = await query(`SELECT to_regclass($1) as exists`, [`public.${tableName}`]);
+    if (tableCheck[0].exists) transactionTable = tableName;
+  }
+
+  // Fetch line items
+  const lineItems = await query(`
+    SELECT t.qty, t.amount, c.title, cv.name as variant_name
+    FROM "${transactionTable}" t
+    JOIN campaigns c ON c.id = t.campaign_id
+    LEFT JOIN campaign_variants cv ON cv.id = t.variant_id
+    WHERE t.invoice_id = $1
+  `, [invoice.id]);
+
+  // Fetch NGO Configs
+  const ngoConfigs = await query(`SELECT ngo_name FROM ngo_configs LIMIT 1`);
+  const ngoName = ngoConfigs.length > 0 ? ngoConfigs[0].ngo_name : 'Lembaga Kami';
+
+  return { ...invoice, instructions, lineItems, ngoName };
 }
 
 

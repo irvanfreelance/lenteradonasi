@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { formatIDR } from '@/lib/utils';
 import CampaignSummaryCard from './CampaignSummaryCard';
 
@@ -11,6 +11,7 @@ const LS_KEY = 'lenteradonasi_checkout_data';
 export default function CheckoutProfile({ campaign, variants }: any) {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -63,13 +64,14 @@ export default function CheckoutProfile({ campaign, variants }: any) {
   const isProfileComplete = (name.trim() !== '' || isAnonymous) && 
                             isValidEmail && 
                             isValidPhone && 
-                            (email !== '' || phone !== '');
+                            phone !== '';
 
   const currentTotalAmount = checkoutData.amount || 0;
   const donationMode = checkoutData.donationMode || 'open';
   const packageQty = checkoutData.packageQty || 1;
 
   const goNext = () => {
+    setIsNavigating(true);
     // Save donor data
     localStorage.setItem('lenteradonasi_donor_data', JSON.stringify({
       name, email, phone, isAnonymous
@@ -92,7 +94,7 @@ export default function CheckoutProfile({ campaign, variants }: any) {
   return (
     <div className="flex flex-col h-full bg-slate-50 relative pb-24">
       <div className="bg-white p-4 flex items-center border-b border-gray-100 shadow-sm z-10 sticky top-0">
-        <button onClick={() => router.back()} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft size={24} /></button>
+        <button onClick={() => { setIsNavigating(true); router.back(); }} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft size={24} /></button>
         <h2 className="font-bold text-lg text-gray-800 ml-2">Lengkapi Data</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-5 pb-32">
@@ -118,16 +120,16 @@ export default function CheckoutProfile({ campaign, variants }: any) {
             </div>
 
             <div className="mb-4">
-               <label className="block text-xs font-bold text-gray-700 mb-1.5">Alamat Email</label>
-               <input type="email" placeholder="contoh@gmail.com" value={email} onChange={e => setEmail(e.target.value)} className={`w-full bg-white border ${email && !isValidEmail ? 'border-red-500' : 'border-gray-200'} py-3 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors`} />
-               {email && !isValidEmail && <p className="text-red-500 text-[10px] mt-1">Format email tidak valid</p>}
+               <label className="block text-xs font-bold text-gray-700 mb-1.5">Nomor WhatsApp</label>
+               <input type="tel" placeholder="081234xxxx" value={phone} onChange={e => setPhone(e.target.value)} className={`w-full bg-white border ${phone && !isValidPhone ? 'border-red-500' : 'border-gray-200'} py-3 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors`} />
+               {phone && !isValidPhone && <p className="text-red-500 text-[10px] mt-1">Format telepon tidak valid</p>}
             </div>
 
             <div className="mb-5">
-               <label className="block text-xs font-bold text-gray-700 mb-1.5">Nomor WhatsApp <span className="text-gray-400 font-medium">(Opsional)</span></label>
-               <input type="tel" placeholder="081234xxxx" value={phone} onChange={e => setPhone(e.target.value)} className={`w-full bg-white border ${phone && !isValidPhone ? 'border-red-500' : 'border-gray-200'} py-3 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors`} />
-               {phone && !isValidPhone && <p className="text-red-500 text-[10px] mt-1">Format telepon tidak valid</p>}
-               <p className="text-[10px] text-gray-500 mt-2">Masukan nomor darurat bisa kami hubungi.</p>
+               <label className="block text-xs font-bold text-gray-700 mb-1.5">Alamat Email</label>
+               <input type="email" placeholder="contoh@gmail.com" value={email} onChange={e => setEmail(e.target.value)} className={`w-full bg-white border ${email && !isValidEmail ? 'border-red-500' : 'border-gray-200'} py-3 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors`} />
+               {email && !isValidEmail && <p className="text-red-500 text-[10px] mt-1">Format email tidak valid</p>}
+               <p className="text-[10px] text-gray-500 mt-2">Nomor WhatsApp dan Email diperlukan untuk pengiriman notifikasi dan laporan.</p>
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-100 pt-4">
@@ -176,7 +178,9 @@ export default function CheckoutProfile({ campaign, variants }: any) {
 
       </div>
       <div className="absolute bottom-0 w-full bg-white p-4 border-t border-gray-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] text-center">
-         <button onClick={goNext} disabled={!isProfileComplete} className="w-full bg-teal-600 text-white font-bold text-lg py-4 rounded-xl disabled:bg-gray-300 active:scale-[0.98] transition-transform">Pilih Metode Pembayaran</button>
+         <button onClick={goNext} disabled={!isProfileComplete || isNavigating} className={`w-full flex items-center justify-center gap-2 text-white font-bold text-lg py-4 rounded-xl active:scale-[0.98] transition-transform ${(!isProfileComplete || isNavigating) ? 'bg-gray-300' : 'bg-teal-600'}`}>
+            {isNavigating ? <><Loader2 className="animate-spin" size={20} /> Memproses...</> : 'Pilih Metode Pembayaran'}
+         </button>
       </div>
     </div>
   );

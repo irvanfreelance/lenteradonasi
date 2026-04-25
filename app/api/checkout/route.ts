@@ -92,7 +92,33 @@ export async function POST(req: Request) {
     const adminFeeFlat = Number(paymentMethod.admin_fee_flat) || 0;
     const adminFeePct = Number(paymentMethod.admin_fee_pct) || 0;
     const adminFee = adminFeeFlat + (parsed.amount * (adminFeePct / 100));
-    const totalAmount = parsed.amount + adminFee;
+    let totalAmount = parsed.amount + adminFee;
+
+    let uniqueCode = 0;
+    if (paymentMethod.type === 'manual' || paymentMethod.type === 'manual_transfer') {
+      let isUnique = false;
+      let attempts = 0;
+      while (!isUnique && attempts < 20) {
+        uniqueCode = Math.floor(100 + Math.random() * 900); // 100 to 999
+        const potentialTotal = totalAmount + uniqueCode;
+        
+        // Check uniqueness for today
+        const checkResult = await query(`
+          SELECT id FROM invoices 
+          WHERE payment_method_id = $1 
+          AND total_amount = $2 
+          AND status = 'PENDING' 
+          AND created_at::date = CURRENT_DATE
+          LIMIT 1
+        `, [paymentMethod.id, potentialTotal]);
+        
+        if (checkResult.length === 0) {
+          isUnique = true;
+          totalAmount = potentialTotal; // Apply unique code to total amount
+        }
+        attempts++;
+      }
+    }
 
     // 3. Generate Invoice Code
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -212,36 +238,91 @@ export async function POST(req: Request) {
       invoiceCreatedAt
     ]);
 
-    const insertTransaction = await query(`
-      INSERT INTO transactions (
-        invoice_id, invoice_created_at, campaign_id, qty, amount, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id
-    `, [invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.qty, parsed.amount, now]);
+    // Check if campaign is bundle
+    const campaignResult = await query(`SELECT is_bundle FROM campaigns WHERE id = $1`, [parsed.campaignId]);
+    const isBundle = campaignResult.length > 0 ? campaignResult[0].is_bundle : false;
 
-    const transactionId = insertTransaction[0].id;
+    let transactionIdToUse = null;
 
-    // Duplicate to Partition Table
-    await query(`
-      INSERT INTO "${transactionTable}" (
-        id, invoice_id, invoice_created_at, campaign_id, qty, amount, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [transactionId, invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.qty, parsed.amount, now]);
+    if (isBundle) {
+      // Fetch bundle items
+      const bundleItems = await query(`
+        SELECT cb.item_campaign_id, cb.qty, COALESCE(cv.price, c.minimum_amount, 0) as unit_price
+        FROM campaign_bundles cb
+        JOIN campaigns c ON c.id = cb.item_campaign_id
+        LEFT JOIN campaign_variants cv ON cv.campaign_id = c.id AND cv.is_active = true
+        WHERE cb.bundle_campaign_id = $1
+      `, [parsed.campaignId]);
+
+      let totalCalculatedValue = 0;
+      bundleItems.forEach((item: any) => {
+        totalCalculatedValue += (item.qty * item.unit_price);
+      });
+
+      let remainingAmount = parsed.amount;
+
+      for (let i = 0; i < bundleItems.length; i++) {
+        const item = bundleItems[i];
+        const itemQty = item.qty * parsed.qty;
+        
+        // Calculate apportioned amount
+        let itemAmount = 0;
+        if (i === bundleItems.length - 1) {
+          itemAmount = remainingAmount;
+        } else {
+          itemAmount = Math.floor(parsed.amount * ((item.qty * item.unit_price) / (totalCalculatedValue || 1)));
+          remainingAmount -= itemAmount;
+        }
+
+        const insertTransaction = await query(`
+          INSERT INTO transactions (
+            invoice_id, invoice_created_at, campaign_id, bundle_campaign_id, qty, amount, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id
+        `, [invoiceId, invoiceCreatedAt, item.item_campaign_id, parsed.campaignId, itemQty, itemAmount, now]);
+
+        const transactionId = insertTransaction[0].id;
+        if (i === 0) transactionIdToUse = transactionId;
+
+        // Duplicate to Partition Table
+        await query(`
+          INSERT INTO "${transactionTable}" (
+            id, invoice_id, invoice_created_at, campaign_id, bundle_campaign_id, qty, amount, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [transactionId, invoiceId, invoiceCreatedAt, item.item_campaign_id, parsed.campaignId, itemQty, itemAmount, now]);
+      }
+    } else {
+      const insertTransaction = await query(`
+        INSERT INTO transactions (
+          invoice_id, invoice_created_at, campaign_id, qty, amount, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+      `, [invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.qty, parsed.amount, now]);
+
+      transactionIdToUse = insertTransaction[0].id;
+
+      // Duplicate to Partition Table
+      await query(`
+        INSERT INTO "${transactionTable}" (
+          id, invoice_id, invoice_created_at, campaign_id, qty, amount, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [transactionIdToUse, invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.qty, parsed.amount, now]);
+    }
 
     // Optional: Insert Qurban Names
-    if (parsed.qurbanNames && parsed.qurbanNames.length > 0) {
+    if (parsed.qurbanNames && parsed.qurbanNames.length > 0 && transactionIdToUse) {
       for (const qName of parsed.qurbanNames) {
         if (qName.trim()) {
           const insertQurban = await query(`
             INSERT INTO transaction_qurban_names (transaction_id, transaction_created_at, mudhohi_name, created_at)
             VALUES ($1, $2, $3, $4)
             RETURNING id
-          `, [transactionId, invoiceCreatedAt, qName.trim(), now]);
+          `, [transactionIdToUse, invoiceCreatedAt, qName.trim(), now]);
           
           await query(`
             INSERT INTO "${qurbanTable}" (id, transaction_id, transaction_created_at, mudhohi_name, created_at)
             VALUES ($1, $2, $3, $4, $5)
-          `, [insertQurban[0].id, transactionId, invoiceCreatedAt, qName.trim(), now]);
+          `, [insertQurban[0].id, transactionIdToUse, invoiceCreatedAt, qName.trim(), now]);
         }
       }
     }

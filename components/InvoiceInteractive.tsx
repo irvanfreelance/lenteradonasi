@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Copy, Clock, ChevronDown, Upload, Image as ImageIcon, CheckCircle, RefreshCcw, Loader2 } from 'lucide-react';
+import { Copy, Clock, ChevronDown, Upload, Image as ImageIcon, CheckCircle, RefreshCcw, Loader2, Download } from 'lucide-react';
 import Link from 'next/link';
 import { formatIDR } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,10 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
   const router = useRouter();
   const [copiedVa, setCopiedVa] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
-  const [timeLeft, setTimeLeft] = useState('23:59:59');
+  const [timeLeft, setTimeLeft] = useState({ h: '23', m: '59', s: '59' });
+  const [isExpired, setIsExpired] = useState(false);
+  const [expireDateStr, setExpireDateStr] = useState('');
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   
   // Upload States
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -20,25 +23,45 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
 
   const isManual = invoice.payment_method_name?.toLowerCase().includes('manual') || invoice.va_number === '7123456789';
 
-  // Simulated countdown
+  // Realtime countdown based on expire_at or created_at + 24h
   useEffect(() => {
-    let hours = 23, minutes = 59, seconds = 59;
+    if (!invoice.created_at && !invoice.invoice_code?.startsWith('SIM-')) return;
+    
+    const createdAt = new Date(invoice.created_at || new Date());
+    
+    // Expire time is the minimum of 6 hours from now or end of today (23:59:59)
+    const target6Hours = new Date(createdAt.getTime() + 6 * 60 * 60 * 1000);
+    const endOfDay = new Date(createdAt);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const expireTime = target6Hours < endOfDay ? target6Hours : endOfDay;
+
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const d = expireTime;
+    const dateStr = `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()].toLowerCase()} ${d.getFullYear()} Pukul ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
+    setExpireDateStr(dateStr);
+
     const interval = setInterval(() => {
-      seconds--;
-      if (seconds < 0) {
-        seconds = 59;
-        minutes--;
-        if (minutes < 0) {
-          minutes = 59;
-          hours--;
-        }
+      const now = new Date();
+      const diff = expireTime.getTime() - now.getTime();
+      
+      if (diff <= 0) {
+        setTimeLeft({ h: '00', m: '00', s: '00' });
+        setIsExpired(true);
+        clearInterval(interval);
+        return;
       }
-      setTimeLeft(
-        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-      );
+      
+      const h = Math.floor((diff / (1000 * 60 * 60))).toString().padStart(2, '0');
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
+      const s = Math.floor((diff % (1000 * 60)) / 1000).toString().padStart(2, '0');
+      
+      setTimeLeft({ h, m, s });
     }, 1000);
+    
     return () => clearInterval(interval);
-  }, []);
+  }, [invoice.created_at, invoice.invoice_code]);
 
   const handleCopyVa = () => {
     if (invoice.va_number) {
@@ -114,6 +137,36 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
     }
   };
 
+  const handleDownloadPDF = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const { toPng } = await import('html-to-image');
+      const { jsPDF } = await import('jspdf');
+      
+      const element = document.getElementById('pdf-template');
+      if (!element) return;
+      
+      const dataUrl = await toPng(element, { 
+        cacheBust: true, 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2
+      });
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${invoice.invoice_code || 'Invoice'}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal mendownload PDF. Pastikan koneksi stabil.');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 relative pb-32">
       {/* Toast VA */}
@@ -133,26 +186,87 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
         <h2 className="font-bold text-lg text-gray-800">Instruksi Pembayaran</h2>
       </div>
 
-      <div className="p-5 pb-40 flex-1 w-full">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <Clock className="text-yellow-600 shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-bold text-yellow-800 text-sm mb-1">Selesaikan Pembayaran Sebelum</h3>
-            <p className="text-yellow-700 text-xs font-bold font-mono bg-yellow-100 inline-block px-2 py-1 rounded">
-              {timeLeft}
-            </p>
+      <div className="p-5 pb-40 flex-1 w-full" id="invoice-content">
+        <div className="bg-[#FFFCEB] border border-[#FDEB96] rounded-2xl p-6 mb-6 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <Clock size={80} />
           </div>
+          
+          <div className="flex flex-col items-center text-center mb-5">
+            <div className="flex items-center gap-1.5 text-[#854d0e] mb-1">
+              <Clock size={14} className="animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">Batas Waktu Pembayaran</span>
+            </div>
+            <h3 className="font-medium text-[#713f12] text-base leading-tight">
+              {expireDateStr}
+            </h3>
+          </div>
+          
+          <div className="flex justify-center items-center gap-3">
+             <div className="flex flex-col items-center gap-1">
+               <div className="bg-white border border-[#fef08a] rounded-xl w-14 h-14 flex items-center justify-center shadow-sm">
+                  <span className="text-2xl font-black text-[#713f12]">{timeLeft.h}</span>
+               </div>
+               <span className="text-[10px] font-bold text-[#a16207] uppercase">Jam</span>
+             </div>
+             <span className="text-2xl font-bold text-[#fef08a] mb-5">:</span>
+             <div className="flex flex-col items-center gap-1">
+               <div className="bg-white border border-[#fef08a] rounded-xl w-14 h-14 flex items-center justify-center shadow-sm">
+                  <span className="text-2xl font-black text-[#713f12]">{timeLeft.m}</span>
+               </div>
+               <span className="text-[10px] font-bold text-[#a16207] uppercase">Menit</span>
+             </div>
+             <span className="text-2xl font-bold text-[#fef08a] mb-5">:</span>
+             <div className="flex flex-col items-center gap-1">
+               <div className="bg-white border border-[#fef08a] rounded-xl w-14 h-14 flex items-center justify-center shadow-sm">
+                  <span className="text-2xl font-black text-[#713f12]">{timeLeft.s}</span>
+               </div>
+               <span className="text-[10px] font-bold text-[#a16207] uppercase">Detik</span>
+             </div>
+          </div>
+          
+          {isExpired && (
+            <div className="mt-4 pt-4 border-t border-yellow-200/50 w-full">
+              <p className="text-red-600 font-bold text-sm text-center">Waktu pembayaran telah habis.</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white border text-center border-gray-100 rounded-2xl p-6 shadow-sm mb-6 relative overflow-hidden">
            <div className="absolute top-0 left-0 w-full h-1 bg-teal-500"></div>
            <p className="text-gray-500 text-sm font-semibold mb-1">Total Tagihan</p>
            
-           <div className="flex items-center justify-center gap-3 mb-6">
-             <h1 className="text-3xl font-extrabold text-teal-600">{formatIDR(Number(invoice.total_amount))}</h1>
-             <button onClick={handleCopyAmount} className="text-teal-600 bg-teal-50 p-1.5 rounded-lg hover:bg-teal-100 transition-colors active:scale-95" title="Salin Nominal">
-               <Copy size={16} />
-             </button>
+           <div className="flex flex-col items-center justify-center mb-6">
+             {isManual ? (() => {
+               const amtStr = Number(invoice.total_amount).toString();
+               const last3 = amtStr.length >= 3 ? amtStr.slice(-3) : amtStr;
+               const rest = amtStr.length >= 3 ? amtStr.slice(0, -3) : '';
+               const formattedRest = rest ? formatIDR(Number(rest)) : 'Rp ';
+               return (
+                 <div className="w-full flex flex-col items-center">
+                   <div className="flex items-center justify-center gap-3 mb-2 w-full border border-gray-200 p-4 rounded-xl">
+                     <h1 className="text-3xl font-extrabold text-gray-700">
+                       {formattedRest.replace(',00', '')}.<span className="bg-yellow-300 text-gray-800 px-1 rounded">{last3}</span>
+                     </h1>
+                     <button onClick={handleCopyAmount} className="text-blue-600 border border-blue-600 bg-white px-3 py-1.5 rounded-lg hover:bg-blue-50 font-bold text-sm transition-colors active:scale-95" title="Salin Nominal">
+                       Salin
+                     </button>
+                   </div>
+                   <div className="w-full bg-[#FFFCEB] border border-[#FDEB96] p-3 rounded-lg flex items-center gap-2 mb-2">
+                     <div className="w-5 h-5 rounded-full border-2 border-red-500 text-red-500 flex items-center justify-center font-bold text-xs shrink-0">!</div>
+                     <p className="text-sm font-semibold text-gray-800">Pastikan nominal sesuai hingga 3 digit terakhir</p>
+                   </div>
+                   <p className="text-xs text-gray-500 italic text-left w-full">* 3 Angka terakhir atau kode unik akan didonasikan</p>
+                 </div>
+               );
+             })() : (
+               <div className="flex items-center justify-center gap-3 w-full">
+                 <h1 className="text-3xl font-extrabold text-teal-600">{formatIDR(Number(invoice.total_amount))}</h1>
+                 <button onClick={handleCopyAmount} className="text-teal-600 bg-teal-50 p-1.5 rounded-lg hover:bg-teal-100 transition-colors active:scale-95" title="Salin Nominal">
+                   <Copy size={16} />
+                 </button>
+               </div>
+             )}
            </div>
            
            {/* Dynamic Payment Details */}
@@ -228,8 +342,13 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
            ) : null}
         </div>
 
-
-        <h3 className="font-bold text-gray-800 mb-4 px-1">Cara Pembayaran</h3>
+        <div className="flex justify-between items-center mb-4 px-1">
+          <h3 className="font-bold text-gray-800 text-lg">Cara Pembayaran</h3>
+          <button onClick={handleDownloadPDF} disabled={isDownloadingPdf} className="flex items-center gap-1.5 text-teal-600 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+            {isDownloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Download PDF
+          </button>
+        </div>
         
         <div className="flex flex-col gap-3 mb-6">
           {invoice.instructions?.map((inst: any, idx: number) => (
@@ -302,6 +421,115 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
           ) : isManual && !selectedFile ? 'Pilih Foto Dahulu' : 'Saya Sudah Bayar'}
         </button>
       </div>
+
+      {/* Hidden PDF Template - Rendered off-screen, captured by html-to-image */}
+      <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none' }}>
+        <div id="pdf-template" style={{ width: '794px', background: 'white', color: '#1a1a1a', padding: '48px', fontFamily: 'Arial, sans-serif', fontSize: '13px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e5e7eb', paddingBottom: '20px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '48px', height: '48px', background: '#0d9488', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '20px' }}>L</div>
+              <span style={{ fontWeight: '800', fontSize: '20px', color: '#0f766e' }}>{invoice.ngoName || 'Lembaga Kami'}</span>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontWeight: '700', fontSize: '15px' }}>ID Donasi : {invoice.invoice_code}</p>
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Created: {invoice.created_at ? new Date(invoice.created_at).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }) : '-'}</p>
+            </div>
+          </div>
+          <p style={{ fontWeight: '900', fontSize: '20px', fontStyle: 'italic', marginBottom: '24px' }}>{invoice.payment_method_name}</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid #e5e7eb', paddingBottom: '20px', marginBottom: '20px' }}>
+            <div>
+              <p style={{ fontSize: '13px', color: '#4b5563' }}>Dear <strong>{invoice.donor_name}</strong>,</p>
+              <p style={{ fontSize: '13px', color: '#4b5563' }}>Silakan Selesaikan Donasi Anda :</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Total Donasi</p>
+              <p style={{ fontWeight: '900', fontSize: '28px' }}>{formatIDR(Number(invoice.total_amount))}</p>
+            </div>
+          </div>
+          <p style={{ fontWeight: '700', fontSize: '15px', marginBottom: '12px' }}>Rincian Donasi</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '8px', fontSize: '13px', marginBottom: '20px' }}>
+            <div style={{ color: '#6b7280', fontWeight: '600' }}>Kode Pembayaran</div>
+            <div style={{ fontWeight: '700' }}>{invoice.va_number || (isManual ? 'Lihat rekening di instruksi' : '-')}</div>
+            <div style={{ color: '#6b7280', fontWeight: '600' }}>Batas Pembayaran</div>
+            <div>{expireDateStr || (invoice.created_at ? new Date(new Date(invoice.created_at).getTime() + 6*60*60*1000).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }) : '-')}</div>
+          </div>
+          <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', marginBottom: '20px' }}>
+            <thead>
+              <tr style={{ background: '#f3f4f6' }}>
+                <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: '700', color: '#6b7280' }}>Deskripsi</th>
+                <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '700', color: '#6b7280' }}>Nominal Donasi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.lineItems?.length > 0 ? (
+                invoice.lineItems.map((item: any, idx: number) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '8px 12px' }}>{item.title || item.variant_name} (x{item.qty})</td>
+                    <td style={{ textAlign: 'right', padding: '8px 12px' }}>{formatIDR(Number(item.amount))}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <td style={{ padding: '8px 12px' }}>Donasi</td>
+                  <td style={{ textAlign: 'right', padding: '8px 12px' }}>{formatIDR(Number(invoice.base_amount || invoice.total_amount))}</td>
+                </tr>
+              )}
+              {Number(invoice.admin_fee) > 0 && (
+                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <td style={{ padding: '8px 12px' }}>Biaya Admin</td>
+                  <td style={{ textAlign: 'right', padding: '8px 12px' }}>{formatIDR(Number(invoice.admin_fee))}</td>
+                </tr>
+              )}
+              <tr style={{ fontWeight: '700', background: '#f9fafb' }}>
+                <td style={{ padding: '10px 12px' }}>TOTAL</td>
+                <td style={{ textAlign: 'right', padding: '10px 12px' }}>{formatIDR(Number(invoice.total_amount))}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style={{ marginBottom: '28px', padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px' }}>
+            <p style={{ fontWeight: '700', marginBottom: '4px' }}>PERHATIAN!</p>
+            <p style={{ fontSize: '12px', color: '#4b5563', lineHeight: '1.6' }}>Mohon selesaikan pembayaran donasi Anda sebelum {expireDateStr || (invoice.created_at ? new Date(new Date(invoice.created_at).getTime() + 6*60*60*1000).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }) : '-')}. Apabila melewati batas waktu, donasi Anda akan otomatis dibatalkan.</p>
+          </div>
+
+          {/* Manual transfer unique code box in PDF */}
+          {isManual && invoice.total_amount && (() => {
+            const amtStr = Number(invoice.total_amount).toString();
+            const last3 = amtStr.length >= 3 ? amtStr.slice(-3) : amtStr;
+            return (
+              <div style={{ marginBottom: '24px', padding: '12px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <div>
+                  <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px', color: '#c2410c' }}>⚠ Pastikan Transfer Sesuai Nominal Termasuk 3 Digit Terakhir</p>
+                  <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>Nominal yang harus ditransfer (termasuk kode unik):</p>
+                  <p style={{ fontWeight: '900', fontSize: '20px', color: '#1a1a1a', letterSpacing: '1px' }}>
+                    {Number(invoice.total_amount).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
+                    <span style={{ background: '#fbbf24', padding: '0 4px', borderRadius: '4px', marginLeft: '8px', fontSize: '18px' }}>{last3}</span>
+                  </p>
+                  <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>* 3 angka terakhir ({last3}) adalah kode unik yang membantu kami mengidentifikasi pembayaran Anda secara otomatis.</p>
+                </div>
+              </div>
+            );
+          })()}
+          {invoice.instructions?.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', fontSize: '12px' }}>
+              {invoice.instructions.map((inst: any, idx: number) => (
+                <div key={idx}>
+                  <p style={{ fontWeight: '700', marginBottom: '8px', fontSize: '13px' }}>{inst.title}</p>
+                  <div
+                    style={{ color: '#4b5563', lineHeight: '1.8' }}
+                    dangerouslySetInnerHTML={{
+                      __html: inst.content
+                        .replace(/<ol[^>]*>/gi, '<ol style="margin:0;padding-left:18px;list-style-type:decimal">')
+                        .replace(/<ul[^>]*>/gi, '<ul style="margin:0;padding-left:18px;list-style-type:disc">')
+                        .replace(/<li[^>]*>/gi, '<li style="margin-bottom:4px">')
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
