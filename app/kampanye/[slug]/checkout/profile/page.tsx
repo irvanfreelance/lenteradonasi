@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import CheckoutAmount from "@/components/CheckoutAmount";
+import CheckoutProfile from "@/components/CheckoutProfile";
 
 export const revalidate = 0;
 
@@ -12,13 +12,13 @@ async function getCampaignData(slug: string) {
   return { campaign: json.data, variants: json.data.variants || [] };
 }
 
-export default async function CheckoutPage(props: { params: Promise<{ slug: string }> }) {
+export default async function ProfilePage(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
   const data = await getCampaignData(params.slug);
   if (!data) notFound();
 
   return (
-    <CheckoutAmount 
+    <CheckoutProfile 
       campaign={data.campaign} 
       variants={data.variants} 
     />

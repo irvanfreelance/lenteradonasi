@@ -35,7 +35,49 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
     qurbanNames: [] as string[]
   });
 
+  // Load from LocalStorage
+  React.useEffect(() => {
+    const saved = localStorage.getItem('lenteradonasi_donor_data');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setDonationData(prev => {
+          const newData = {
+            ...prev,
+            name: parsed.name || prev.name,
+            email: parsed.email || prev.email,
+            phone: parsed.phone || prev.phone,
+            isAnonymous: typeof parsed.isAnonymous === 'boolean' ? parsed.isAnonymous : prev.isAnonymous,
+          };
+          
+          // Restore payment method if exists
+          if (parsed.paymentMethodId && paymentMethods) {
+            const found = paymentMethods.find((pm: any) => pm.id === parsed.paymentMethodId);
+            if (found) newData.paymentMethod = found;
+          }
+          
+          return newData;
+        });
+      } catch (e) {
+        console.error('Failed to parse saved donor data', e);
+      }
+    }
+  }, [paymentMethods]);
+
+  // Save to LocalStorage
+  React.useEffect(() => {
+    const dataToSave = {
+      name: donationData.name,
+      email: donationData.email,
+      phone: donationData.phone,
+      isAnonymous: donationData.isAnonymous,
+      paymentMethodId: donationData.paymentMethod?.id
+    };
+    localStorage.setItem('lenteradonasi_donor_data', JSON.stringify(dataToSave));
+  }, [donationData.name, donationData.email, donationData.phone, donationData.isAnonymous, donationData.paymentMethod]);
+
   const goBackUrl = `/kampanye/${campaign.slug}`;
+
 
   // Validasi Profile
   const isValidEmail = donationData.email === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(donationData.email);
@@ -84,6 +126,7 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
         amount: currentTotalAmount,
         donorName: donationData.name.trim() || (donationData.isAnonymous ? 'Hamba Allah' : 'Anonim'),
         donorEmail: donationData.email || null,
+        donorPhone: donationData.phone || null,
         isAnonymous: donationData.isAnonymous,
         paymentMethodId: donationData.paymentMethod.id,
         paymentType: donationData.paymentMethod.code,
@@ -94,6 +137,7 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
         tiktokClickId: getCookie('ttclid') || null,
         googleClickId: getCookie('gclid') || null
       };
+
 
       const res = await fetch('/api/checkout', {
         method: 'POST',
@@ -347,6 +391,14 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
     return acc;
   }, {});
 
+  const typeLabels: Record<string, string> = {
+    'va': 'Virtual Account',
+    'e_wallet': 'E-Wallet',
+    'retail_outlet': 'Gerai Retail',
+    'qr_code': 'QR Code / QRIS',
+    'manual': 'Transfer Manual'
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-50 relative pb-24">
         <div className="bg-white p-4 flex items-center border-b border-gray-100 shadow-sm z-10 sticky top-0">
@@ -363,7 +415,8 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
 
           {Object.entries(groupPayments || {}).map(([type, methods]: any, idx) => (
             <div key={idx} className="mb-6">
-              <h3 className="font-bold text-[11px] text-gray-800 mb-3 uppercase tracking-wider">{type}</h3>
+              <h3 className="font-bold text-[11px] text-gray-800 mb-3 uppercase tracking-wider">{typeLabels[type] || type}</h3>
+
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 {methods.map((m: any, mIdx: number) => {
                   const isSelected = donationData.paymentMethod?.id === m.id;

@@ -155,19 +155,79 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
              </button>
            </div>
            
-           <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
-             <p className="text-xs text-gray-500 mb-1 font-semibold">{isManual ? 'Nomor Rekening' : 'Nomor Virtual Account'} ({invoice.payment_method_name})</p>
-             <div className="flex items-center justify-between gap-3">
-               <div className="flex flex-col">
-                 <span className="text-2xl font-bold tracking-wider text-gray-800">{invoice.va_number || 'Tidak tersedia'}</span>
-                 {isManual && <span className="text-xs text-gray-500 font-medium mt-1">a/n Yayasan Peduli Sesama</span>}
+           {/* Dynamic Payment Details */}
+           {invoice.payment_method_type === 'va' || invoice.payment_method_type === 'manual' ? (
+             <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
+               <p className="text-xs text-gray-500 mb-1 font-semibold">{invoice.payment_method_type === 'manual' ? 'Nomor Rekening' : 'Nomor Virtual Account'} ({invoice.payment_method_name})</p>
+               <div className="flex items-center justify-between gap-3">
+                 <div className="flex flex-col">
+                   <span className="text-2xl font-bold tracking-wider text-gray-800">{invoice.va_number || 'Tidak tersedia'}</span>
+                   {invoice.payment_method_type === 'manual' && <span className="text-xs text-gray-500 font-medium mt-1">a/n Yayasan Peduli Sesama</span>}
+                 </div>
+                 <button onClick={handleCopyVa} className="text-teal-600 bg-teal-50 p-2 shrink-0 rounded-lg hover:bg-teal-100 transition-colors active:scale-95" title="Salin">
+                   <Copy size={18} />
+                 </button>
                </div>
-               <button onClick={handleCopyVa} className="text-teal-600 bg-teal-50 p-2 shrink-0 rounded-lg hover:bg-teal-100 transition-colors active:scale-95" title="Salin">
-                 <Copy size={18} />
+             </div>
+           ) : invoice.payment_method_type === 'retail_outlet' ? (
+             <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-center">
+               <p className="text-xs text-gray-500 mb-3 font-semibold">Kode Pembayaran ({invoice.payment_method_name})</p>
+               <h2 className="text-3xl font-black tracking-widest text-gray-800 mb-4">{invoice.va_number}</h2>
+               <div className="bg-white p-3 rounded-lg border border-gray-200 inline-block mb-3">
+                 <img 
+                   src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${invoice.va_number}&scale=2&rotate=N&includetext`} 
+                   alt="Barcode Pembayaran"
+                   className="h-16 mx-auto"
+                 />
+               </div>
+               <button onClick={handleCopyVa} className="w-full flex items-center justify-center gap-2 text-teal-600 bg-teal-50 py-2 rounded-lg font-bold text-sm">
+                 <Copy size={16} /> Salin Kode
                </button>
              </div>
-           </div>
+           ) : invoice.payment_method_type === 'e_wallet' ? (
+             <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
+               <p className="text-xs text-gray-500 mb-4 font-semibold">Bayar Menggunakan {invoice.payment_method_name}</p>
+               {invoice.payment_url ? (
+                 <a 
+                   href={invoice.payment_url} 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="bg-[#6000D3] text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                   style={{ backgroundColor: invoice.payment_method_code === 'OVO' ? '#6000D3' : '#322E85' }}
+                 >
+                   Buka Aplikasi {invoice.payment_method_name}
+                 </a>
+               ) : (
+                 <p className="text-red-500 text-xs">Link pembayaran tidak tersedia.</p>
+               )}
+               <p className="text-[10px] text-gray-400 mt-4 italic">*Anda akan diarahkan ke aplikasi {invoice.payment_method_name} untuk menyelesaikan pembayaran.</p>
+             </div>
+           ) : invoice.payment_method_type === 'qr_code' ? (
+              <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
+                <p className="text-xs text-gray-500 mb-4 font-semibold">Scan QR Code untuk Membayar</p>
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 inline-block">
+                  {(() => {
+                    let qrString = '';
+                    try {
+                      const urlData = JSON.parse(invoice.payment_url || '{}');
+                      qrString = urlData.qr_string || '';
+                    } catch (e) {
+                      qrString = invoice.payment_url || '';
+                    }
+                    return qrString ? (
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrString)}`} 
+                        alt="QR Code Pembayaran"
+                        className="w-48 h-48 mx-auto"
+                      />
+                    ) : <p className="text-red-500 text-xs">QR Code tidak tersedia.</p>;
+                  })()}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-4 italic">*Bisa di-scan menggunakan DANA, OVO, GoPay, ShopeePay, atau LinkAja.</p>
+              </div>
+           ) : null}
         </div>
+
 
         <h3 className="font-bold text-gray-800 mb-4 px-1">Cara Pembayaran</h3>
         
@@ -175,10 +235,13 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
           {invoice.instructions?.map((inst: any, idx: number) => (
             <details key={idx} className="group bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" open={idx === 0}>
               <summary className="font-bold text-sm text-gray-800 p-4 cursor-pointer list-none flex justify-between items-center bg-gray-50/50 hover:bg-gray-50 transition-colors select-none">
-                {inst.title}
-                <ChevronDown size={18} className="text-gray-400 group-open:rotate-180 transition-transform" />
+                <span className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</span>
+                  {inst.title}
+                </span>
+                <ChevronDown size={18} className="text-gray-400 group-open:rotate-180 transition-transform shrink-0 ml-2" />
               </summary>
-              <div className="p-4 border-t border-gray-100 bg-white" dangerouslySetInnerHTML={{ __html: inst.content }}></div>
+              <div className="p-4 border-t border-gray-100 bg-white text-sm text-gray-700 leading-relaxed [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-2 [&_strong]:font-bold [&_strong]:text-gray-900" dangerouslySetInnerHTML={{ __html: inst.content }}></div>
             </details>
           ))}
         </div>
