@@ -15,7 +15,7 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
     }
 
     const updates = await query(`
-      SELECT cu.*, c.slug as campaign_slug
+      SELECT cu.*, c.slug as campaign_slug, c.title as campaign_title, c.image_url as campaign_image
       FROM campaign_updates cu
       JOIN campaigns c ON cu.campaign_id = c.id
       WHERE cu.id = $1

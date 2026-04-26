@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
 import DonorsTab from "@/components/DonorsTab";
+import ShareButton from "@/components/ShareButton";
 import type { Metadata } from "next";
 export async function generateMetadata(
   props: { params: Promise<{ slug: string }> }
@@ -79,6 +80,11 @@ export default async function CampaignDetail(props: { params: Promise<{ slug: st
           <Link href="/" className="w-10 h-10 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white">
             <ChevronLeft size={24} />
           </Link>
+          <ShareButton 
+            url={`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/kampanye/${campaign.slug}`} 
+            title={campaign.title} 
+            className="w-10 h-10 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white border-none hover:bg-white/40 transition-all"
+          />
         </div>
       </div>
 

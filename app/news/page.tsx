@@ -35,7 +35,8 @@ export default async function NewsPage() {
                 <Link
                   key={update.id}
                   href={`/news/${update.id}`}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden block active:scale-[0.98] transition-transform"
+                  prefetch={true}
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden block"
                 >
                   {update.image_url && (
                     <div className="h-40 w-full bg-gray-100 relative">
@@ -48,7 +49,7 @@ export default async function NewsPage() {
                       <span className="text-[10px] text-gray-400 font-medium">{formattedDate}</span>
                     </div>
                     <h3 className="font-bold text-gray-800 text-base leading-snug mb-2">{update.title}</h3>
-                    <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed">{update.excerpt}</p>
+                    <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed">{update.excerpt?.replace(/\\n/g, '\n')}</p>
                     <div className="flex items-center gap-2 pt-3 border-t border-gray-50">
                       <span className="text-[10px] text-gray-400">Dari kampanye:</span>
                       <span className="text-[10px] font-semibold text-gray-700 line-clamp-1">{update.campaign_title}</span>

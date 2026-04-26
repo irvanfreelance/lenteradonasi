@@ -16,7 +16,7 @@ const LS_KEY = 'lenteradonasi_checkout_data';
 export default function CheckoutAmount({ campaign, variants }: any) {
   const router = useRouter();
 
-  const [donationMode, setDonationMode] = useState(campaign.is_fixed_amount ? 'package' : 'open');
+  const [donationMode, setDonationMode] = useState((campaign.is_fixed_amount || campaign.is_qurban) ? 'package' : 'open');
   const [packageQty, setPackageQty] = useState(1);
   const [zakatMode, setZakatMode] = useState('calculator');
   const [zakatCalcType, setZakatCalcType] = useState('profesi');
@@ -92,7 +92,7 @@ export default function CheckoutAmount({ campaign, variants }: any) {
         <CampaignSummaryCard campaign={campaign} />
 
         {/* Toggle Donasi Paket vs Donasi Bebas for fixed_amount campaigns */}
-        {campaign.is_fixed_amount && !campaign.is_zakat && (
+        {campaign.is_fixed_amount && !campaign.is_zakat && !campaign.is_qurban && (
           <div className="flex bg-gray-200/60 p-1 rounded-xl mb-6">
              <button onClick={() => setDonationMode('package')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${donationMode === 'package' ? 'bg-white text-teal-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}>Donasi Paket</button>
              <button onClick={() => setDonationMode('open')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${donationMode === 'open' ? 'bg-white text-teal-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}>Donasi Bebas</button>
