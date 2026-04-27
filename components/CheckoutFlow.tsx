@@ -121,6 +121,19 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
         return undefined;
       };
 
+      // Read affiliate session from localStorage (stored per-campaign by AffiliateTracker, valid 30 days)
+      let affiliateId: number | null = null;
+      try {
+        const lsAffKey = `lenteradonasi_affiliate_${campaign.id}`;
+        const affRaw = localStorage.getItem(lsAffKey);
+        if (affRaw) {
+          const affParsed = JSON.parse(affRaw);
+          if (affParsed.affiliateId && Date.now() - (affParsed.capturedAt || 0) < 30 * 24 * 60 * 60 * 1000) {
+            affiliateId = affParsed.affiliateId;
+          }
+        }
+      } catch { /* ignore */ }
+
       const payload = {
         campaignId: campaign.id,
         amount: currentTotalAmount,
@@ -132,6 +145,7 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
         paymentType: donationData.paymentMethod.code,
         qty: donationMode === 'package' ? packageQty : 1,
         qurbanNames: donationData.qurbanNames,
+        affiliateId,
         fbClickId: getCookie('fbclid') || null,
         fbBrowserId: getCookie('_fbp') || null,
         tiktokClickId: getCookie('ttclid') || null,

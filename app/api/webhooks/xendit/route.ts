@@ -65,7 +65,9 @@ export async function POST(req: Request) {
       try {
         // 1. Fetch details for Redis & Workflow
         const invoiceDetails = await query(`
-          SELECT i.id, i.total_amount, i.donor_name_snapshot, i.is_anonymous, i.doa, t.campaign_id, c.slug
+          SELECT i.id, i.base_amount, i.total_amount, i.donor_name_snapshot, i.is_anonymous, i.doa,
+                 t.campaign_id, t.affiliate_id,
+                 c.slug
           FROM invoices i
           JOIN transactions t ON i.id = t.invoice_id AND i.created_at = t.invoice_created_at
           JOIN campaigns c ON t.campaign_id = c.id
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
 
         if (invoiceDetails.length > 0) {
           const detail = invoiceDetails[0];
-          const { campaign_id, total_amount, donor_name_snapshot, is_anonymous, doa, slug } = detail;
+          const { campaign_id, affiliate_id, base_amount, total_amount, donor_name_snapshot, is_anonymous, doa, slug } = detail;
 
           // 2. Immediate Redis Update (Stats)
           const statsKey = `campaign:${campaign_id}:stats`;
@@ -94,7 +96,7 @@ export async function POST(req: Request) {
           await redis.lpush(donorListKey, donorData);
           await redis.ltrim(donorListKey, 0, 99); // Keep last 100
 
-          // 4. Trigger Upstash Workflow for DB Sync
+          // 4. Trigger Upstash Workflow for DB Sync (campaign stats)
           const workflowClient = new Client({ token: process.env.QSTASH_TOKEN! });
           await workflowClient.trigger({
             url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/workflow/payment-success`,
@@ -105,6 +107,19 @@ export async function POST(req: Request) {
               slug
             },
           });
+
+          // 5. If this transaction has an affiliate, trigger commission workflow
+          if (affiliate_id) {
+            await workflowClient.trigger({
+              url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/workflow/affiliate-commission`,
+              body: {
+                invoiceCode,
+                campaignId: campaign_id,
+                affiliateId: affiliate_id,
+                baseAmount: Number(base_amount),
+              },
+            });
+          }
         }
       } catch (redisErr) {
         console.error("Redis/Workflow update error:", redisErr);

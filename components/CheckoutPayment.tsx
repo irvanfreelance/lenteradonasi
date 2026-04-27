@@ -137,6 +137,7 @@ export default function CheckoutPayment({ campaign, paymentMethods }: any) {
         paymentType: selectedPayment.code,
         qty: checkoutData.donationMode === 'package' ? checkoutData.packageQty : 1,
         qurbanNames: checkoutData.qurbanNames || [],
+        affiliateId: checkoutData.affiliateId || null,
         fbClickId: getCookie('fbclid') || null,
         fbBrowserId: getCookie('_fbp') || null,
         tiktokClickId: getCookie('ttclid') || null,

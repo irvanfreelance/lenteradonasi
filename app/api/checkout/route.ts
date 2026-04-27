@@ -18,6 +18,7 @@ const checkoutSchema = z.object({
   paymentType: z.string(),
   qty: z.coerce.number().default(1),
   qurbanNames: z.array(z.string()).optional(),
+  affiliateId: z.coerce.number().optional().nullable(),
   fbClickId: z.string().optional().nullable(),
   fbBrowserId: z.string().optional().nullable(),
   tiktokClickId: z.string().optional().nullable(),
@@ -277,10 +278,10 @@ export async function POST(req: Request) {
 
         const insertTransaction = await query(`
           INSERT INTO transactions (
-            invoice_id, invoice_created_at, campaign_id, bundle_campaign_id, qty, amount, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            invoice_id, invoice_created_at, campaign_id, bundle_campaign_id, affiliate_id, qty, amount, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING id
-        `, [invoiceId, invoiceCreatedAt, item.item_campaign_id, parsed.campaignId, itemQty, itemAmount, now]);
+        `, [invoiceId, invoiceCreatedAt, item.item_campaign_id, parsed.campaignId, parsed.affiliateId || null, itemQty, itemAmount, now]);
 
         const transactionId = insertTransaction[0].id;
         if (i === 0) transactionIdToUse = transactionId;
@@ -288,26 +289,26 @@ export async function POST(req: Request) {
         // Duplicate to Partition Table
         await query(`
           INSERT INTO "${transactionTable}" (
-            id, invoice_id, invoice_created_at, campaign_id, bundle_campaign_id, qty, amount, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `, [transactionId, invoiceId, invoiceCreatedAt, item.item_campaign_id, parsed.campaignId, itemQty, itemAmount, now]);
+            id, invoice_id, invoice_created_at, campaign_id, bundle_campaign_id, affiliate_id, qty, amount, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [transactionId, invoiceId, invoiceCreatedAt, item.item_campaign_id, parsed.campaignId, parsed.affiliateId || null, itemQty, itemAmount, now]);
       }
     } else {
       const insertTransaction = await query(`
         INSERT INTO transactions (
-          invoice_id, invoice_created_at, campaign_id, qty, amount, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          invoice_id, invoice_created_at, campaign_id, affiliate_id, qty, amount, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id
-      `, [invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.qty, parsed.amount, now]);
+      `, [invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.affiliateId || null, parsed.qty, parsed.amount, now]);
 
       transactionIdToUse = insertTransaction[0].id;
 
       // Duplicate to Partition Table
       await query(`
         INSERT INTO "${transactionTable}" (
-          id, invoice_id, invoice_created_at, campaign_id, qty, amount, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [transactionIdToUse, invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.qty, parsed.amount, now]);
+          id, invoice_id, invoice_created_at, campaign_id, affiliate_id, qty, amount, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [transactionIdToUse, invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.affiliateId || null, parsed.qty, parsed.amount, now]);
     }
 
     // Optional: Insert Qurban Names

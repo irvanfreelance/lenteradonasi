@@ -56,6 +56,20 @@ export default function CheckoutAmount({ campaign, variants }: any) {
     : amount;
 
   const goNext = () => {
+    // Read affiliate from localStorage (stored per-campaign by AffiliateTracker)
+    const lsAffKey = `lenteradonasi_affiliate_${campaign.id}`;
+    const affRaw = localStorage.getItem(lsAffKey);
+    let affiliateId: number | null = null;
+    if (affRaw) {
+      try {
+        const affParsed = JSON.parse(affRaw);
+        // Affiliate session is valid for 30 days
+        if (affParsed.affiliateId && Date.now() - (affParsed.capturedAt || 0) < 30 * 24 * 60 * 60 * 1000) {
+          affiliateId = affParsed.affiliateId;
+        }
+      } catch { /* ignore */ }
+    }
+
     // Save to localStorage
     const existing = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
     const data = {
@@ -74,6 +88,7 @@ export default function CheckoutAmount({ campaign, variants }: any) {
       variantName: variants?.[0]?.name,
       variantPrice: variants?.[0]?.price,
       variantNamesPerQty: variants?.[0]?.names_per_qty || 1,
+      affiliateId,
     };
     localStorage.setItem(LS_KEY, JSON.stringify(data));
     router.push(`/kampanye/${campaign.slug}/checkout/profile`);
