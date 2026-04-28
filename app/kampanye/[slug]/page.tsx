@@ -2,13 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 import CheckoutButton from "@/components/CheckoutButton";
 import { notFound } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
 import ShareButton from "@/components/ShareButton";
 import AffiliateTracker from "@/components/AffiliateTracker";
 import CampaignTabs from "@/components/CampaignTabs";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+
+export const revalidate = 60;
 
 export async function generateMetadata(
   props: { params: Promise<{ slug: string }> }
@@ -43,6 +45,7 @@ export async function generateMetadata(
 
 async function getCampaignDetail(slug: string) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  // ISR cache: Next.js dedupes concurrent RSC calls automatically
   const res = await fetch(`${baseUrl}/api/campaigns/${slug}`, { next: { revalidate: 60 } });
   if (!res.ok) {
     if (res.status === 404) return null;
@@ -50,6 +53,20 @@ async function getCampaignDetail(slug: string) {
   }
   const json = await res.json();
   return json.data;
+}
+
+// Pre-generate the top 20 campaigns as static pages at build time
+export async function generateStaticParams() {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/campaigns`, { next: { revalidate: 300 } });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const campaigns: any[] = json.data || [];
+    return campaigns.slice(0, 20).map((c: any) => ({ slug: c.slug }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function CampaignDetail(props: {
@@ -79,6 +96,7 @@ export default async function CampaignDetail(props: {
           sizes="(max-width: 768px) 100vw, 600px"
           className="object-cover"
           priority
+          quality={85}
         />
         <div className="absolute top-0 w-full p-4 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent">
           <Link href="/" className="w-10 h-10 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white">

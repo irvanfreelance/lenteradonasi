@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-export default function CheckoutButton({ href, label }: { href: string, label: string }) {
+export default function CheckoutButton({ href, label }: { href: string; label: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  // Prefetch the checkout page as soon as this button is visible
+  // so navigation is instant when clicked
+  useEffect(() => {
+    router.prefetch(href);
+  }, [href, router]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();

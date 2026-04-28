@@ -1,38 +1,23 @@
-import { notFound } from "next/navigation";
+// Payment step — payment methods prefetched in parallel with ISR cache (5 min)
+// Campaign data comes from localStorage, NOT from a fresh server fetch
 import CheckoutPayment from "@/components/CheckoutPayment";
 
-export const revalidate = 0;
+export const revalidate = 300; // ISR: payment methods cached for 5 min
 
-async function getCheckoutData(slug: string) {
+async function getPaymentMethods() {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  
-  const [campRes, pmRes] = await Promise.all([
-    fetch(`${baseUrl}/api/campaigns/${slug}`, { cache: 'no-store' }),
-    fetch(`${baseUrl}/api/payment-methods`, { next: { revalidate: 300 } })
-  ]);
-
-  if (!campRes.ok || !pmRes.ok) return null;
-  
-  const campJson = await campRes.json();
-  const pmJson = await pmRes.json();
-
-  if (!campJson.data) return null;
-
-  return { 
-    campaign: campJson.data, 
-    paymentMethods: pmJson.data 
-  };
+  const res = await fetch(`${baseUrl}/api/payment-methods`, {
+    next: { revalidate: 300 } // ISR cache
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
 }
 
-export default async function PaymentPage(props: { params: Promise<{ slug: string }> }) {
-  const params = await props.params;
-  const data = await getCheckoutData(params.slug);
-  if (!data) notFound();
+export default async function PaymentPage() {
+  const paymentMethods = await getPaymentMethods();
 
   return (
-    <CheckoutPayment 
-      campaign={data.campaign} 
-      paymentMethods={data.paymentMethods} 
-    />
+    <CheckoutPayment paymentMethods={paymentMethods} />
   );
 }

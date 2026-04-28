@@ -79,15 +79,17 @@ export async function POST(req: Request) {
     const clientIpAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'Unknown';
     const clientUserAgent = req.headers.get('user-agent') || 'Unknown';
 
-    // 1. Prepare Dynamic Tables
+    // 1. Prepare Dynamic Tables + Fetch Payment Method in parallel
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const suffix = `y${year}m${month}`;
-    const { invoiceTable, transactionTable, qurbanTable } = await ensureMonthlyTables(suffix);
 
-    // 2. Fetch Payment Method
-    const pmResult = await query(`SELECT * FROM payment_methods WHERE id = $1`, [parsed.paymentMethodId]);
+    const [{ invoiceTable, transactionTable, qurbanTable }, pmResult] = await Promise.all([
+      ensureMonthlyTables(suffix),
+      query(`SELECT * FROM payment_methods WHERE id = $1`, [parsed.paymentMethodId]),
+    ]);
+
     if (pmResult.length === 0) return NextResponse.json({ status: 'error', message: 'Invalid payment method' }, { status: 400 });
     const paymentMethod = pmResult[0];
 
@@ -174,25 +176,33 @@ export async function POST(req: Request) {
       }
     }
 
-    // 5. Donor Management (Upsert)
+    // 5. Donor Management (Upsert) — parallel phone + email lookups
     let donorId = null;
 
     if (phone || email) {
       try {
-        let existingDonor = [];
-        if (phone) {
-          existingDonor = await query(`SELECT id FROM donors WHERE phone = $1`, [phone]);
-        }
-        if (existingDonor.length === 0 && email) {
-          existingDonor = await query(`SELECT id FROM donors WHERE email = $1`, [email]);
+        let existingDonor: any[] = [];
+
+        if (phone && email) {
+          // Lookup both in parallel, take first match
+          const [byPhone, byEmail] = await Promise.all([
+            query(`SELECT id FROM donors WHERE phone = $1 LIMIT 1`, [phone]),
+            query(`SELECT id FROM donors WHERE email = $1 LIMIT 1`, [email]),
+          ]);
+          existingDonor = byPhone.length > 0 ? byPhone : byEmail;
+        } else if (phone) {
+          existingDonor = await query(`SELECT id FROM donors WHERE phone = $1 LIMIT 1`, [phone]);
+        } else if (email) {
+          existingDonor = await query(`SELECT id FROM donors WHERE email = $1 LIMIT 1`, [email]);
         }
 
         if (existingDonor.length > 0) {
           donorId = existingDonor[0].id;
-          await query(`UPDATE donors SET name = $1, is_anonymous_default = $2 WHERE id = $3`, [name, isAnonymousDefault, donorId]);
+          // Fire-and-forget donor update — don't block invoice creation
+          query(`UPDATE donors SET name = $1, is_anonymous_default = $2 WHERE id = $3`, [name, isAnonymousDefault, donorId]).catch(console.error);
         } else {
           const newDonor = await query(`
-            INSERT INTO donors (name, email, phone, is_anonymous_default) 
+            INSERT INTO donors (name, email, phone, is_anonymous_default)
             VALUES ($1, $2, $3, $4) RETURNING id
           `, [name, email, phone, isAnonymousDefault]);
           donorId = newDonor[0].id;

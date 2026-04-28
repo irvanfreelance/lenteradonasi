@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Minus, Plus } from 'lucide-react';
 import { formatIDR } from '@/lib/utils';
@@ -55,7 +55,7 @@ export default function CheckoutAmount({ campaign, variants }: any) {
     ? variants[0].price * packageQty 
     : amount;
 
-  const goNext = () => {
+  const goNext = useCallback(() => {
     // Read affiliate from localStorage (stored per-campaign by AffiliateTracker)
     const lsAffKey = `lenteradonasi_affiliate_${campaign.id}`;
     const affRaw = localStorage.getItem(lsAffKey);
@@ -92,7 +92,13 @@ export default function CheckoutAmount({ campaign, variants }: any) {
     };
     localStorage.setItem(LS_KEY, JSON.stringify(data));
     router.push(`/kampanye/${campaign.slug}/checkout/profile`);
-  };
+  }, [campaign, variants, currentTotalAmount, donationMode, packageQty, router]);
+
+  // Prefetch next steps in the background so navigation feels instant
+  useEffect(() => {
+    router.prefetch(`/kampanye/${campaign.slug}/checkout/profile`);
+    router.prefetch(`/kampanye/${campaign.slug}/checkout/payment`);
+  }, [campaign.slug, router]);
 
   const goBackUrl = `/kampanye/${campaign.slug}`;
 
