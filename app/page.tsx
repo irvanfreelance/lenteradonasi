@@ -66,9 +66,25 @@ async function getData(searchQ?: string) {
     categoriesData = JSON.parse(categoriesData) as any;
   }
 
+  // 3. Fetch configs
+  const cacheKeyConf = `ngo:configs:global_v2`;
+  let configsData: any = await redis.get(cacheKeyConf);
+  if (!configsData) {
+    const confRes = await query('SELECT * FROM ngo_configs LIMIT 1');
+    if (confRes.length > 0) {
+      configsData = confRes[0];
+      await redis.set(cacheKeyConf, JSON.stringify(configsData), { ex: 3600 });
+    } else {
+      configsData = {};
+    }
+  } else if (typeof configsData === 'string') {
+    configsData = JSON.parse(configsData);
+  }
+
   return { 
     campaigns: (campaignsData as any).data || [], 
-    categories: (categoriesData as any).data || [] 
+    categories: (categoriesData as any).data || [],
+    configs: configsData
   };
 }
 
@@ -77,13 +93,13 @@ export default async function Home(props: { searchParams?: Promise<{ [key: strin
   const q = typeof searchParams?.q === 'string' ? searchParams.q : undefined;
   const isSearching = !!q;
   
-  const { campaigns: allCampaigns, categories } = await getData(q);
+  const { campaigns: allCampaigns, categories, configs } = await getData(q);
   const urgentCampaigns = allCampaigns.filter((c: any) => c.is_urgent && !isSearching);
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-teal-50/60 to-slate-50 relative pb-24">
       {/* Header */}
-      <Header isSearching={isSearching} />
+      <Header isSearching={isSearching} logoUrl={configs?.logo_url} ngoName={configs?.ngo_name} />
 
       <SearchInput />
 
@@ -117,9 +133,18 @@ export default async function Home(props: { searchParams?: Promise<{ [key: strin
 
       {/* Campaign List */}
       <div className="px-5 pb-6">
-        <h2 className="font-bold text-gray-800 text-base mb-4">
-          {isSearching ? `Hasil Pencarian (${allCampaigns.length})` : "Rekomendasi Kebaikan"}
-        </h2>
+        {isSearching ? (
+          <div className="mb-5 pt-4">
+            <h2 className="font-bold text-gray-800 text-xl tracking-tight">
+              Hasil Pencarian
+            </h2>
+            <p className="text-sm font-medium text-gray-500 mt-1">{allCampaigns.length} Program Ditemukan</p>
+          </div>
+        ) : (
+          <h2 className="font-bold text-gray-800 text-base mb-4 mt-2">
+            Rekomendasi Kebaikan
+          </h2>
+        )}
 
         {allCampaigns.length === 0 ? (
           <div className="text-center py-10">
@@ -138,25 +163,31 @@ export default async function Home(props: { searchParams?: Promise<{ [key: strin
       {!isSearching && (
         <div className="px-5 py-8 bg-slate-100 border-t border-gray-200 mt-4">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-700 rounded-lg flex items-center justify-center shadow-sm">
-              <Heart size={16} className="text-white fill-white" />
-            </div>
-            <span className="font-extrabold text-teal-700 text-base leading-none tracking-tight">Peduli<span className="text-teal-400">Sesama</span></span>
+            {configs?.logo_url ? (
+              <img src={configs.logo_url} alt="Logo" className="h-8 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-700 rounded-lg flex items-center justify-center shadow-sm">
+                  <Heart size={16} className="text-white fill-white" />
+                </div>
+                <span className="font-extrabold text-teal-700 text-base leading-none tracking-tight">Peduli<span className="text-teal-400">Sesama</span></span>
+              </>
+            )}
           </div>
           <p className="text-xs text-gray-500 leading-relaxed mb-4 text-justify">
-            Lembaga filantropi independen yang berdedikasi untuk menyalurkan kebaikan donatur secara transparan, profesional, dan tepat sasaran.
+            {configs?.short_description || "Lembaga filantropi independen yang berdedikasi untuk menyalurkan kebaikan donatur secara transparan, profesional, dan tepat sasaran."}
           </p>
           <div className="text-xs text-gray-500 mb-5">
             <p className="font-bold text-gray-700 mb-1">Alamat Kantor Pusat</p>
-            <p>Jl. Kebaikan Bangsa No. 99, Gedung Amal Lt. 2, Jakarta Selatan</p>
+            <p>{configs?.address || "Jl. Kebaikan Bangsa No. 99, Gedung Amal Lt. 2, Jakarta Selatan"}</p>
           </div>
           <div className="flex gap-4">
-            <a href="#" className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-teal-600 hover:bg-teal-50 transition-colors"><Mail size={14} /></a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-teal-600 hover:bg-teal-50 transition-colors"><Globe size={14} /></a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-teal-600 hover:bg-teal-50 transition-colors"><MessageCircle size={14} /></a>
+            <a href={configs?.facebook_url || '#'} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-teal-600 hover:bg-teal-50 transition-colors"><Mail size={14} /></a>
+            <a href={configs?.instagram_url || '#'} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-teal-600 hover:bg-teal-50 transition-colors"><Globe size={14} /></a>
+            <a href={configs?.whatsapp_number ? `https://wa.me/${configs.whatsapp_number}` : '#'} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-teal-600 hover:bg-teal-50 transition-colors"><MessageCircle size={14} /></a>
           </div>
           <div className="mt-6 pt-4 border-t border-gray-200 text-center">
-            <p className="text-[10px] text-gray-400">© 2026 Yayasan Peduli Sesama. All rights reserved.</p>
+            <p className="text-[10px] text-gray-400">© {new Date().getFullYear()} {configs?.ngo_name || 'Yayasan Peduli Sesama'}. All rights reserved.</p>
           </div>
         </div>
       )}

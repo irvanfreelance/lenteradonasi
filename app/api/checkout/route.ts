@@ -33,16 +33,34 @@ async function ensureMonthlyTables(suffix: string) {
 
   // Check if invoice table exists
   const tableCheck = await query(`SELECT to_regclass($1) as exists`, [`public.${invoiceTable}`]);
+  
   if (!tableCheck[0].exists) {
     console.log(`Creating dynamic tables for ${suffix}...`);
     
-    // Create Invoices Partition-like table
-    await query(`CREATE TABLE IF NOT EXISTS "public"."${invoiceTable}" (LIKE invoices INCLUDING ALL)`);
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
     
-    // Create Transactions Partition-like table
-    await query(`CREATE TABLE IF NOT EXISTS "public"."${transactionTable}" (LIKE transactions INCLUDING ALL)`);
+    // Calculate date range for native partition (YYYY-MM-DD)
+    const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const nextMonth = new Date(year, month + 1, 1);
+    const endDate = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
+
+    // 1. Create Invoices Partition
+    await query(`
+      CREATE TABLE IF NOT EXISTS "public"."${invoiceTable}" 
+      PARTITION OF invoices 
+      FOR VALUES FROM ('${startDate}') TO ('${endDate}')
+    `);
     
-    // Create Qurban Partition-like table
+    // 2. Create Transactions Partition
+    await query(`
+      CREATE TABLE IF NOT EXISTS "public"."${transactionTable}" 
+      PARTITION OF transactions 
+      FOR VALUES FROM ('${startDate}') TO ('${endDate}')
+    `);
+    
+    // 3. Create Qurban Partition-like table (This one is not natively partitioned in this schema)
     await query(`CREATE TABLE IF NOT EXISTS "public"."${qurbanTable}" (LIKE transaction_qurban_names INCLUDING ALL)`);
 
     // Add Notification Flags & Fix Constraints
@@ -56,13 +74,10 @@ async function ensureMonthlyTables(suffix: string) {
         ADD COLUMN IF NOT EXISTS "is_ads_sent" bool DEFAULT false;
       `);
 
-      await query(`ALTER TABLE "${transactionTable}" DROP CONSTRAINT IF EXISTS "transactions_invoice_id_invoice_created_at_fkey"`);
-      await query(`ALTER TABLE "${transactionTable}" ADD CONSTRAINT "${transactionTable}_invoice_fk" 
-                   FOREIGN KEY (invoice_id, invoice_created_at) REFERENCES "${invoiceTable}"(id, created_at) ON DELETE CASCADE`);
-      
+      // Native partitions inherit constraints, but we ensure foreign keys if needed for the manual qurban table
       await query(`ALTER TABLE "${qurbanTable}" DROP CONSTRAINT IF EXISTS "transaction_qurban_names_transaction_id_transaction_creat_fkey1"`);
       await query(`ALTER TABLE "${qurbanTable}" ADD CONSTRAINT "${qurbanTable}_transaction_fk" 
-                   FOREIGN KEY (transaction_id, transaction_created_at) REFERENCES "${transactionTable}"(id, created_at) ON DELETE CASCADE`);
+                   FOREIGN KEY (transaction_id, transaction_created_at) REFERENCES transactions(id, created_at) ON DELETE CASCADE`);
     } catch (e) {
       console.error("Error setting up dynamic tables:", e);
     }
@@ -99,7 +114,8 @@ export async function POST(req: Request) {
     let totalAmount = parsed.amount + adminFee;
 
     let uniqueCode = 0;
-    if (paymentMethod.type === 'manual' || paymentMethod.type === 'manual_transfer') {
+    const pmType = paymentMethod.type?.toLowerCase() || '';
+    if (pmType === 'manual' || pmType === 'manual_transfer' || pmType.includes('manual')) {
       let isUnique = false;
       let attempts = 0;
       while (!isUnique && attempts < 20) {
@@ -141,11 +157,19 @@ export async function POST(req: Request) {
     let xenditPaymentRequestId = null;
     let xenditResponseData = null;
 
-    if (paymentMethod.provider === 'xendit') {
+    const provider = paymentMethod.provider?.toLowerCase();
+    const type = paymentMethod.type?.toLowerCase() || '';
+
+    if (provider === 'xendit') {
       let xenditType: XenditPaymentType = 'VIRTUAL_ACCOUNT';
-      if (paymentMethod.type === 'e_wallet') xenditType = 'EWALLET';
-      else if (paymentMethod.type === 'retail_outlet') xenditType = 'OVER_THE_COUNTER';
-      else if (paymentMethod.type === 'qr_code') xenditType = 'QR_CODE';
+      
+      if (type.includes('e_wallet') || type.includes('e-wallet') || type.includes('ewallet')) {
+        xenditType = 'EWALLET';
+      } else if (type.includes('retail') || type.includes('outlet') || type.includes('over_the_counter')) {
+        xenditType = 'OVER_THE_COUNTER';
+      } else if (type.includes('qr') || type === 'qr_code') {
+        xenditType = 'QR_CODE';
+      }
 
       xenditResponseData = await createXenditPaymentRequest({
         externalId: invoiceCode,
@@ -201,6 +225,9 @@ export async function POST(req: Request) {
           // Fire-and-forget donor update — don't block invoice creation
           query(`UPDATE donors SET name = $1, is_anonymous_default = $2 WHERE id = $3`, [name, isAnonymousDefault, donorId]).catch(console.error);
         } else {
+          // Sync sequence once to prevent duplicate key errors (if it was out of sync)
+          await query(`SELECT setval('donors_id_seq1', (SELECT MAX(id) FROM donors))`).catch(() => {});
+          
           const newDonor = await query(`
             INSERT INTO donors (name, email, phone, is_anonymous_default)
             VALUES ($1, $2, $3, $4) RETURNING id
@@ -233,22 +260,7 @@ export async function POST(req: Request) {
     const invoiceId = insertInvoice[0].id;
     const invoiceCreatedAt = insertInvoice[0].created_at;
 
-    // Duplicate to Partition Table
-    await query(`
-      INSERT INTO "${invoiceTable}" (
-        id, invoice_code, payment_method_id, donor_id, donor_name_snapshot, donor_email, donor_phone, is_anonymous, doa,
-        base_amount, admin_fee, total_amount, status, payment_url, va_number,
-        xendit_payment_request_id,
-        fb_click_id, fb_browser_id, tiktok_click_id, google_click_id, client_ip_address, client_user_agent,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-    `, [
-      invoiceId, invoiceCode, parsed.paymentMethodId, donorId, name, email, phone, parsed.isAnonymous, parsed.doa || null,
-      parsed.amount, adminFee, totalAmount, 'PENDING', paymentUrl, externalVa,
-      xenditPaymentRequestId,
-      parsed.fbClickId || null, parsed.fbBrowserId || null, parsed.tiktokClickId || null, parsed.googleClickId || null, clientIpAddress, clientUserAgent,
-      invoiceCreatedAt
-    ]);
+    // Redundant duplicate to Partition Table removed (Native partitioning handles this automatically)
 
     // Check if campaign is bundle
     const campaignResult = await query(`SELECT is_bundle FROM campaigns WHERE id = $1`, [parsed.campaignId]);
@@ -296,12 +308,7 @@ export async function POST(req: Request) {
         const transactionId = insertTransaction[0].id;
         if (i === 0) transactionIdToUse = transactionId;
 
-        // Duplicate to Partition Table
-        await query(`
-          INSERT INTO "${transactionTable}" (
-            id, invoice_id, invoice_created_at, campaign_id, bundle_campaign_id, affiliate_id, qty, amount, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        `, [transactionId, invoiceId, invoiceCreatedAt, item.item_campaign_id, parsed.campaignId, parsed.affiliateId || null, itemQty, itemAmount, now]);
+        // Redundant duplicate to Partition Table removed (Native partitioning handles this automatically)
       }
     } else {
       const insertTransaction = await query(`
@@ -313,12 +320,7 @@ export async function POST(req: Request) {
 
       transactionIdToUse = insertTransaction[0].id;
 
-      // Duplicate to Partition Table
-      await query(`
-        INSERT INTO "${transactionTable}" (
-          id, invoice_id, invoice_created_at, campaign_id, affiliate_id, qty, amount, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [transactionIdToUse, invoiceId, invoiceCreatedAt, parsed.campaignId, parsed.affiliateId || null, parsed.qty, parsed.amount, now]);
+      // Redundant duplicate to Partition Table removed (Native partitioning handles this automatically)
     }
 
     // Optional: Insert Qurban Names

@@ -99,6 +99,20 @@ async function getInvoice(invoiceCode: string) {
 
   const result = { ...invoice, instructions, lineItems, ngoName };
 
+  // Normalize payment method type for frontend consistency
+  const rawType = (result.payment_method_type || '').toLowerCase();
+  if (rawType.includes('manual')) {
+    result.payment_method_type = 'manual';
+  } else if (rawType.includes('bank') || rawType.includes('transfer') || rawType === 'va') {
+    result.payment_method_type = 'va';
+  } else if (rawType.includes('e_wallet') || rawType.includes('e-wallet') || rawType.includes('ewallet')) {
+    result.payment_method_type = 'e_wallet';
+  } else if (rawType.includes('retail') || rawType.includes('outlet') || rawType.includes('over_the_counter')) {
+    result.payment_method_type = 'retail_outlet';
+  } else if (rawType.includes('qr') || rawType === 'qr_code') {
+    result.payment_method_type = 'qr_code';
+  }
+
   // Cache PENDING invoices for 30s (they refresh on status change via webhook)
   // Cache PAID invoices for 10 min (static)
   const ttl = invoice.status === 'PAID' ? 600 : 30;

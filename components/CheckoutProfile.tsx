@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import { ChevronLeft, Loader2, Edit3, Check } from 'lucide-react';
 import { formatIDR } from '@/lib/utils';
 
 const LS_KEY = 'lenteradonasi_checkout_data';
@@ -37,6 +37,8 @@ export default function CheckoutProfile() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [qurbanNames, setQurbanNames] = useState<string[]>([]);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isEditing, setIsEditing] = useState(true); // Default to editing unless we find saved data
+  const [hasSavedData, setHasSavedData] = useState(false);
 
   // Read localStorage synchronously on first paint to minimize flash
   useEffect(() => {
@@ -62,6 +64,11 @@ export default function CheckoutProfile() {
       setPhone(d.phone || '');
       setDoa(d.doa || '');
       setIsAnonymous(typeof d.isAnonymous === 'boolean' ? d.isAnonymous : false);
+
+      if (d.name && d.phone) {
+        setHasSavedData(true);
+        setIsEditing(false);
+      }
     }
   }, [router]);
 
@@ -120,7 +127,7 @@ export default function CheckoutProfile() {
         >
           <ChevronLeft size={24} />
         </button>
-        <h2 className="font-bold text-lg text-gray-800 ml-2">Lengkapi Data</h2>
+        <h2 className="font-medium text-lg text-gray-800 ml-2">Lengkapi Data</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 pb-32">
@@ -157,69 +164,134 @@ export default function CheckoutProfile() {
           )}
         </div>
 
-        {/* Donor Profile Form */}
+        {/* Donor Profile Section */}
         <div className="mb-4">
-          <h3 className="font-bold text-gray-800 mb-2.5 text-[10px] uppercase tracking-wider">Profil Donatur</h3>
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-            <div className="mb-3">
-              <label className="block text-[10px] font-bold text-gray-700 mb-1">Nama Lengkap</label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className="w-full bg-white border border-gray-200 py-2.5 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors"
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-[10px] font-bold text-gray-700 mb-1">Nomor WhatsApp</label>
-              <input
-                type="tel"
-                placeholder="081234xxxx"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                className={`w-full bg-white border ${phone && !isValidPhone ? 'border-red-500' : 'border-gray-200'} py-2.5 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors`}
-              />
-              {phone && !isValidPhone && <p className="text-red-500 text-[10px] mt-1">Format telepon tidak valid</p>}
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-[10px] font-bold text-gray-700 mb-1">Alamat Email</label>
-              <input
-                type="email"
-                placeholder="contoh@gmail.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className={`w-full bg-white border ${email && !isValidEmail ? 'border-red-500' : 'border-gray-200'} py-2.5 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors`}
-              />
-              {email && !isValidEmail && <p className="text-red-500 text-[10px] mt-1">Format email tidak valid</p>}
-              <p className="text-[9px] text-gray-400 mt-1.5 italic">Nomor WhatsApp dan Email diperlukan untuk pengiriman notifikasi.</p>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-              <div>
-                <p className="text-[13px] font-bold text-gray-800">Sembunyikan nama saya</p>
-                <p className="text-[9px] text-gray-400 italic">Tampil sebagai Hamba Allah</p>
-              </div>
-              <div
-                onClick={() => setIsAnonymous(!isAnonymous)}
-                className={`w-10 h-5 flex items-center rounded-full p-1 cursor-pointer transition-colors ${isAnonymous ? 'bg-teal-500' : 'bg-gray-300'}`}
+          <div className="flex justify-between items-center mb-2.5">
+            <h3 className="font-normal text-gray-800 text-[13px]">
+              {isEditing ? 'Profil Donatur' : 'Lanjutkan dengan Data Berikut'}
+            </h3>
+            {hasSavedData && !isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="text-orange-500 font-bold text-xs flex items-center gap-1 border border-orange-200 bg-orange-50 px-3 py-1 rounded-lg hover:bg-orange-100 transition-colors"
               >
-                <div className={`bg-white w-3 h-3 rounded-full shadow-sm transform transition-transform ${isAnonymous ? 'translate-x-5' : ''}`} />
+                Edit Data <Edit3 size={12} />
+              </button>
+            )}
+          </div>
+
+          {!isEditing ? (
+            /* Quick Selection Card for Returning Donors */
+            <div className="relative bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+              {/* Decorative Stripe Header */}
+              <div className="h-2 w-full flex">
+                {[...Array(12)].map((_, i) => (
+                  <div key={i} className={`flex-1 h-full \${i % 3 === 0 ? 'bg-red-500' : i % 3 === 1 ? 'bg-blue-600' : 'bg-white'}`} />
+                ))}
+              </div>
+
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h4 className="text-xl font-medium text-gray-800 leading-tight">{name}</h4>
+                    <p className="text-[10px] text-gray-400 font-medium">Ditunaikan atas nama</p>
+                  </div>
+                  <div
+                    onClick={() => setIsAnonymous(!isAnonymous)}
+                    className="flex items-center gap-2 cursor-pointer select-none group"
+                  >
+                    <span className="text-[11px] font-medium text-gray-600 text-right leading-tight max-w-[80px]">Tampilkan Sebagai Hamba Allah</span>
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors \${isAnonymous ? 'bg-teal-500 border-teal-500' : 'bg-white border-gray-300 group-hover:border-teal-400'}`}>
+                      {isAnonymous && <Check size={14} className="text-white" strokeWidth={4} />}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-dashed border-gray-200 pt-4 flex justify-between items-center text-sm font-normal text-gray-700">
+                  <span className="tracking-wide">{phone}</span>
+                  <span className="text-gray-400 font-medium lowercase overflow-hidden text-ellipsis max-w-[180px]">{email}</span>
+                </div>
+              </div>
+
+              {/* Teal Footer Bar */}
+              <div className="bg-[#009689] py-2 px-4 text-center">
+                <p className="text-[10px] font-medium text-white tracking-tight">
+                  *Notifikasi transaksi & penyaluran akan dikirim ke No.HP &/ Email yang aktif
+                </p>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="mb-3">
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full bg-white border border-gray-200 py-2.5 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">Nomor WhatsApp</label>
+                <input
+                  type="tel"
+                  placeholder="081234xxxx"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  className="w-full bg-white border border-gray-200 py-2.5 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors"
+                />
+                {phone && !isValidPhone && <p className="text-red-500 text-[10px] mt-1">Format telepon tidak valid</p>}
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">Alamat Email</label>
+                <input
+                  type="email"
+                  placeholder="contoh@gmail.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full bg-white border border-gray-200 py-2.5 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors"
+                />
+                {email && !isValidEmail && <p className="text-red-500 text-[10px] mt-1">Format email tidak valid</p>}
+                <p className="text-[9px] text-gray-400 mt-1.5 italic">Nomor WhatsApp dan Email diperlukan untuk pengiriman notifikasi.</p>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                <div>
+                  <p className="text-[13px] font-bold text-gray-800">Sembunyikan nama saya</p>
+                  <p className="text-[9px] text-gray-400 italic">Tampil sebagai Hamba Allah</p>
+                </div>
+                <div
+                  onClick={() => setIsAnonymous(!isAnonymous)}
+                  className={`w-10 h-5 flex items-center rounded-full p-1 cursor-pointer transition-colors \${isAnonymous ? 'bg-teal-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`bg-white w-3 h-3 rounded-full shadow-sm transform transition-transform \${isAnonymous ? 'translate-x-5' : ''}`} />
+                </div>
+              </div>
+
+              {hasSavedData && (
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="w-full mt-4 py-2 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  Batal Edit
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Doa / Pesan */}
         <div className="mb-4">
-          <h3 className="font-bold text-gray-800 mb-2.5 text-[10px] uppercase tracking-wider">Doa / Pesan Kebaikan</h3>
+          <h3 className="font-medium text-gray-800 mb-2.5 text-[13px]">Doa / Pesan Kebaikan</h3>
           <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <textarea
+              rows={2}
               placeholder="Tuliskan doa Anda (opsional)..."
               value={doa}
               onChange={e => setDoa(e.target.value)}
-              className="w-full bg-white border border-gray-200 py-3 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors min-h-[80px] resize-none"
+              className="w-full bg-white border border-gray-200 py-2 px-4 rounded-xl outline-teal-500 text-sm focus:border-teal-500 transition-colors resize-none"
             />
           </div>
         </div>

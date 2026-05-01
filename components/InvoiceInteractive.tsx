@@ -284,77 +284,82 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
              )}
            </div>
            
-           {/* Dynamic Payment Details */}
-           {invoice.payment_method_type === 'va' || invoice.payment_method_type === 'manual' ? (
-             <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
-               <p className="text-xs text-gray-500 mb-1 font-semibold">{invoice.payment_method_type === 'manual' ? 'Nomor Rekening' : 'Nomor Virtual Account'} ({invoice.payment_method_name})</p>
-               <div className="flex items-center justify-between gap-3">
-                 <div className="flex flex-col">
-                   <span className="text-2xl font-bold tracking-wider text-gray-800">{invoice.va_number || 'Tidak tersedia'}</span>
-                   {invoice.payment_method_type === 'manual' && <span className="text-xs text-gray-500 font-medium mt-1">a/n Yayasan Peduli Sesama</span>}
-                 </div>
-                 <button onClick={handleCopyVa} className="text-teal-600 bg-teal-50 p-2 shrink-0 rounded-lg hover:bg-teal-100 transition-colors active:scale-95" title="Salin">
-                   <Copy size={18} />
-                 </button>
-               </div>
-             </div>
-           ) : invoice.payment_method_type === 'retail_outlet' ? (
-             <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-center">
-               <p className="text-xs text-gray-500 mb-3 font-semibold">Kode Pembayaran ({invoice.payment_method_name})</p>
-               <h2 className="text-3xl font-black tracking-widest text-gray-800 mb-4">{invoice.va_number}</h2>
-               <div className="bg-white p-3 rounded-lg border border-gray-200 inline-block mb-3">
-                 <img 
-                   src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${invoice.va_number}&scale=2&rotate=N&includetext`} 
-                   alt="Barcode Pembayaran"
-                   className="h-16 mx-auto"
-                 />
-               </div>
-               <button onClick={handleCopyVa} className="w-full flex items-center justify-center gap-2 text-teal-600 bg-teal-50 py-2 rounded-lg font-bold text-sm">
-                 <Copy size={16} /> Salin Kode
-               </button>
-             </div>
-           ) : invoice.payment_method_type === 'e_wallet' ? (
-             <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
-               <p className="text-xs text-gray-500 mb-4 font-semibold">Bayar Menggunakan {invoice.payment_method_name}</p>
-               {invoice.payment_url ? (
-                 <a 
-                   href={invoice.payment_url} 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   className="bg-[#6000D3] text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                   style={{ backgroundColor: invoice.payment_method_code === 'OVO' ? '#6000D3' : '#322E85' }}
-                 >
-                   Buka Aplikasi {invoice.payment_method_name}
-                 </a>
-               ) : (
-                 <p className="text-red-500 text-xs">Link pembayaran tidak tersedia.</p>
-               )}
-               <p className="text-[10px] text-gray-400 mt-4 italic">*Anda akan diarahkan ke aplikasi {invoice.payment_method_name} untuk menyelesaikan pembayaran.</p>
-             </div>
-           ) : invoice.payment_method_type === 'qr_code' ? (
-              <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
-                <p className="text-xs text-gray-500 mb-4 font-semibold">Scan QR Code untuk Membayar</p>
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 inline-block">
-                  {(() => {
-                    let qrString = '';
-                    try {
-                      const urlData = JSON.parse(invoice.payment_url || '{}');
-                      qrString = urlData.qr_string || '';
-                    } catch (e) {
-                      qrString = invoice.payment_url || '';
-                    }
-                    return qrString ? (
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrString)}`} 
-                        alt="QR Code Pembayaran"
-                        className="w-48 h-48 mx-auto"
-                      />
-                    ) : <p className="text-red-500 text-xs">QR Code tidak tersedia.</p>;
-                  })()}
+           {(() => {
+            const pmType = invoice.payment_method_type?.toLowerCase() || '';
+            const isVA = pmType.includes('va') || pmType.includes('bank') || pmType.includes('transfer');
+            const isManualLocal = pmType.includes('manual') || isManual;
+
+            return isVA || isManualLocal ? (
+              <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
+                <p className="text-xs text-gray-500 mb-1 font-semibold">{isManualLocal ? 'Nomor Rekening' : 'Nomor Virtual Account'} ({invoice.payment_method_name})</p>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-2xl font-bold tracking-wider text-gray-800">{invoice.va_number || 'Tidak tersedia'}</span>
+                    {isManualLocal && <span className="text-xs text-gray-500 font-medium mt-1">a/n Yayasan Peduli Sesama</span>}
+                  </div>
+                  <button onClick={handleCopyVa} className="text-teal-600 bg-teal-50 p-2 shrink-0 rounded-lg hover:bg-teal-100 transition-colors active:scale-95" title="Salin">
+                    <Copy size={18} />
+                  </button>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-4 italic">*Bisa di-scan menggunakan DANA, OVO, GoPay, ShopeePay, atau LinkAja.</p>
               </div>
-           ) : null}
+            ) : (pmType.includes('retail') || pmType.includes('outlet') || pmType.includes('over_the_counter')) ? (
+              <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-center">
+                <p className="text-xs text-gray-500 mb-3 font-semibold">Kode Pembayaran ({invoice.payment_method_name})</p>
+                <h2 className="text-3xl font-black tracking-widest text-gray-800 mb-4">{invoice.va_number}</h2>
+                <div className="bg-white p-3 rounded-lg border border-gray-200 inline-block mb-3">
+                  <img 
+                    src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${invoice.va_number}&scale=2&rotate=N&includetext`} 
+                    alt="Barcode Pembayaran"
+                    className="h-16 mx-auto"
+                  />
+                </div>
+                <button onClick={handleCopyVa} className="w-full flex items-center justify-center gap-2 text-teal-600 bg-teal-50 py-2 rounded-lg font-bold text-sm">
+                  <Copy size={16} /> Salin Kode
+                </button>
+              </div>
+            ) : (pmType.includes('e_wallet') || pmType.includes('ewallet') || pmType.includes('e-wallet')) ? (
+              <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
+                <p className="text-xs text-gray-500 mb-4 font-semibold">Bayar Menggunakan {invoice.payment_method_name}</p>
+                {invoice.payment_url ? (
+                  <a 
+                    href={invoice.payment_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-[#6000D3] text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                    style={{ backgroundColor: invoice.payment_method_code === 'OVO' ? '#6000D3' : '#322E85' }}
+                  >
+                    Buka Aplikasi {invoice.payment_method_name}
+                  </a>
+                ) : (
+                  <p className="text-red-500 text-xs">Link pembayaran tidak tersedia.</p>
+                )}
+                <p className="text-[10px] text-gray-400 mt-4 italic">*Anda akan diarahkan ke aplikasi {invoice.payment_method_name} untuk menyelesaikan pembayaran.</p>
+              </div>
+            ) : (pmType.includes('qr') || pmType === 'qr_code') ? (
+               <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
+                 <p className="text-xs text-gray-500 mb-4 font-semibold">Scan QR Code untuk Membayar</p>
+                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 inline-block">
+                   {(() => {
+                     let qrString = '';
+                     try {
+                       const urlData = JSON.parse(invoice.payment_url || '{}');
+                       qrString = urlData.qr_string || '';
+                     } catch (e) {
+                       qrString = invoice.payment_url || '';
+                     }
+                     return qrString ? (
+                       <img 
+                         src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrString)}`} 
+                         alt="QR Code Pembayaran"
+                         className="w-48 h-48 mx-auto"
+                       />
+                     ) : <p className="text-red-500 text-xs">QR Code tidak tersedia.</p>;
+                   })()}
+                 </div>
+                 <p className="text-[10px] text-gray-400 mt-4 italic">*Bisa di-scan menggunakan DANA, OVO, GoPay, ShopeePay, atau LinkAja.</p>
+               </div>
+            ) : null;
+           })()}
         </div>
 
         <div className="flex justify-between items-center mb-4 px-1">
@@ -463,11 +468,35 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
           </div>
           <p style={{ fontWeight: '700', fontSize: '15px', marginBottom: '12px' }}>Rincian Donasi</p>
           <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '8px', fontSize: '13px', marginBottom: '20px' }}>
-            <div style={{ color: '#6b7280', fontWeight: '600' }}>Kode Pembayaran</div>
+            <div style={{ color: '#6b7280', fontWeight: '600' }}>{invoice.payment_method_type?.includes('qr') ? 'QRIS String' : 'Kode Pembayaran'}</div>
             <div style={{ fontWeight: '700' }}>{invoice.va_number || (isManual ? 'Lihat rekening di instruksi' : '-')}</div>
             <div style={{ color: '#6b7280', fontWeight: '600' }}>Batas Pembayaran</div>
             <div>{expireDateStr || (invoice.created_at ? new Date(new Date(invoice.created_at).getTime() + 6*60*60*1000).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }) : '-')}</div>
           </div>
+
+          {/* QR Code in PDF if applicable */}
+          {(invoice.payment_method_type?.includes('qr')) && (
+            <div style={{ textAlign: 'center', marginBottom: '24px', padding: '16px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+              <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px', fontWeight: '700' }}>SCAN QRIS DI BAWAH INI</p>
+              {(() => {
+                let qrString = '';
+                try {
+                  const urlData = JSON.parse(invoice.payment_url || '{}');
+                  qrString = urlData.qr_string || '';
+                } catch (e) {
+                  qrString = invoice.payment_url || '';
+                }
+                return qrString ? (
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrString)}`} 
+                    alt="QR Code"
+                    style={{ width: '180px', height: '180px', margin: '0 auto' }}
+                  />
+                ) : null;
+              })()}
+              <p style={{ fontSize: '10px', color: '#9ca3af', marginTop: '12px' }}>Dapat di-scan menggunakan DANA, OVO, GoPay, ShopeePay, atau LinkAja.</p>
+            </div>
+          )}
           <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', marginBottom: '20px' }}>
             <thead>
               <tr style={{ background: '#f3f4f6' }}>

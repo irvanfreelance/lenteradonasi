@@ -4,7 +4,7 @@ import { useEffect, Suspense } from 'react';
 import { useSearchParams, usePathname } from 'next/navigation';
 import Script from 'next/script';
 
-function TrackingLogic({ metaPixelId, tiktokPixelId, googleAdsId }: { metaPixelId?: string, tiktokPixelId?: string, googleAdsId?: string }) {
+function TrackingLogic({ metaPixelId, tiktokPixelId, googleAdsId, googleAnalyticId }: { metaPixelId?: string, tiktokPixelId?: string, googleAdsId?: string, googleAnalyticId?: string }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
@@ -35,16 +35,23 @@ function TrackingLogic({ metaPixelId, tiktokPixelId, googleAdsId }: { metaPixelI
 export default function TrackingScripts({
   metaPixelId,
   tiktokPixelId,
-  googleAdsId
+  googleAdsId,
+  googleAnalyticId
 }: {
   metaPixelId?: string | null;
   tiktokPixelId?: string | null;
   googleAdsId?: string | null;
+  googleAnalyticId?: string | null;
 }) {
   return (
     <>
       <Suspense fallback={null}>
-        <TrackingLogic metaPixelId={metaPixelId || undefined} tiktokPixelId={tiktokPixelId || undefined} googleAdsId={googleAdsId || undefined} />
+        <TrackingLogic 
+          metaPixelId={metaPixelId || undefined} 
+          tiktokPixelId={tiktokPixelId || undefined} 
+          googleAdsId={googleAdsId || undefined} 
+          googleAnalyticId={googleAnalyticId || undefined}
+        />
       </Suspense>
 
       {/* Meta Pixel */}
@@ -84,19 +91,20 @@ export default function TrackingScripts({
         />
       )}
 
-      {/* Google Ads */}
-      {googleAdsId && (
+      {/* Google Tags (Ads & Analytics) */}
+      {(googleAdsId || googleAnalyticId) && (
         <>
-          <Script strategy="afterInteractive" src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId}`} />
+          <Script strategy="afterInteractive" src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId || googleAnalyticId}`} />
           <Script
-            id="google-ads"
+            id="google-tags"
             strategy="afterInteractive"
             dangerouslySetInnerHTML={{
               __html: `
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
                 gtag('js', new Date());
-                gtag('config', '${googleAdsId}');
+                ${googleAdsId ? `gtag('config', '${googleAdsId}');` : ''}
+                ${googleAnalyticId ? `gtag('config', '${googleAnalyticId}');` : ''}
               `,
             }}
           />
