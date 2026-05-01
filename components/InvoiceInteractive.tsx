@@ -232,20 +232,7 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
           )}
         </div>
 
-        {invoice.doa && (
-          <div className="bg-white border border-teal-100 rounded-2xl p-5 mb-6 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-teal-500"></div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="bg-teal-50 p-1.5 rounded-lg">
-                <CheckCircle size={16} className="text-teal-600" />
-              </div>
-              <h3 className="font-bold text-gray-800 text-sm">Doa / Pesan Kebaikan</h3>
-            </div>
-            <p className="text-gray-700 text-sm italic leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-              "{invoice.doa}"
-            </p>
-          </div>
-        )}
+
 
         <div className="bg-white border text-center border-gray-100 rounded-2xl p-6 shadow-sm mb-6 relative overflow-hidden">
            <div className="absolute top-0 left-0 w-full h-1 bg-teal-500"></div>

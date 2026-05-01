@@ -201,7 +201,7 @@ export default function CheckoutProfile() {
                     className="flex items-center gap-2 cursor-pointer select-none group"
                   >
                     <span className="text-[11px] font-medium text-gray-600 text-right leading-tight max-w-[80px]">Tampilkan Sebagai Hamba Allah</span>
-                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors \${isAnonymous ? 'bg-teal-500 border-teal-500' : 'bg-white border-gray-300 group-hover:border-teal-400'}`}>
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${isAnonymous ? 'border-transparent' : 'bg-white border-gray-300 group-hover:border-gray-400'}`} style={{ backgroundColor: isAnonymous ? 'var(--color-teal-500, #0d9488)' : undefined }}>
                       {isAnonymous && <Check size={14} className="text-white" strokeWidth={4} />}
                     </div>
                   </div>
@@ -213,8 +213,8 @@ export default function CheckoutProfile() {
                 </div>
               </div>
 
-              {/* Teal Footer Bar */}
-              <div className="bg-[#009689] py-2 px-4 text-center">
+              {/* Dynamic Primary Color Footer Bar */}
+              <div className="py-2 px-4 text-center" style={{ backgroundColor: 'var(--color-teal-600, #0d9488)' }}>
                 <p className="text-[10px] font-medium text-white tracking-tight">
                   *Notifikasi transaksi & penyaluran akan dikirim ke No.HP &/ Email yang aktif
                 </p>
@@ -257,23 +257,21 @@ export default function CheckoutProfile() {
                 <p className="text-[9px] text-gray-400 mt-1.5 italic">Nomor WhatsApp dan Email diperlukan untuk pengiriman notifikasi.</p>
               </div>
 
-              <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+              <label className="flex items-center justify-between border-t border-gray-100 pt-4 mt-2 cursor-pointer group">
                 <div>
                   <p className="text-[13px] font-bold text-gray-800">Sembunyikan nama saya</p>
-                  <p className="text-[9px] text-gray-400 italic">Tampil sebagai Hamba Allah</p>
+                  <p className="text-[10px] text-gray-500 italic mt-0.5">Tampil sebagai Hamba Allah</p>
                 </div>
-                <div
-                  onClick={() => setIsAnonymous(!isAnonymous)}
-                  className={`w-10 h-5 flex items-center rounded-full p-1 cursor-pointer transition-colors \${isAnonymous ? 'bg-teal-500' : 'bg-gray-300'}`}
-                >
-                  <div className={`bg-white w-3 h-3 rounded-full shadow-sm transform transition-transform \${isAnonymous ? 'translate-x-5' : ''}`} />
+                <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${isAnonymous ? 'border-transparent' : 'bg-white border-gray-300 group-hover:border-gray-400'}`} style={{ backgroundColor: isAnonymous ? 'var(--color-teal-500, #0d9488)' : undefined }}>
+                  <input type="checkbox" className="sr-only" checked={isAnonymous} onChange={(e) => setIsAnonymous(e.target.checked)} />
+                  {isAnonymous && <Check size={16} className="text-white" strokeWidth={4} />}
                 </div>
-              </div>
+              </label>
 
               {hasSavedData && (
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="w-full mt-4 py-2 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                  className="w-full mt-5 py-3 text-[13px] font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors"
                 >
                   Batal Edit
                 </button>

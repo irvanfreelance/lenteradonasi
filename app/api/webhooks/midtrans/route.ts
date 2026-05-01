@@ -35,10 +35,17 @@ export async function POST(req: Request) {
     }
 
     // Log the payload
-    await query(`
-      INSERT INTO payment_logs (invoice_code, endpoint, request_payload, http_status)
-      VALUES ($1, $2, $3, $4)
-    `, [order_id, '/api/webhooks/midtrans', JSON.stringify(payload), 200]);
+    try {
+      await query(`
+        INSERT INTO payment_logs (invoice_code, endpoint, request_payload, http_status)
+        VALUES ($1, $2, $3, $4)
+      `, [order_id, '/api/webhooks/midtrans', JSON.stringify(payload), 200]);
+    } catch (err: any) {
+      console.error("payment_logs insert error:", err);
+      if (err.code === '23505' && err.constraint === 'payment_logs_pkey') {
+        query(\`SELECT setval('payment_logs_id_seq', (SELECT MAX(id) FROM payment_logs))\`).catch(() => {});
+      }
+    }
 
     return NextResponse.json({ status: 'success' });
   } catch (error) {

@@ -55,10 +55,17 @@ export async function POST(req: Request) {
 
     // Log the payload with event info
     const responsePayload = { status: 'success' };
-    await query(`
-      INSERT INTO payment_logs (invoice_code, endpoint, request_payload, response_payload, http_status)
-      VALUES ($1, $2, $3, $4, $5)
-    `, [invoiceCode, `/api/webhooks/xendit${event ? `:${event}` : ''}`, JSON.stringify(payload), JSON.stringify(responsePayload), 200]);
+    try {
+      await query(`
+        INSERT INTO payment_logs (invoice_code, endpoint, request_payload, response_payload, http_status)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [invoiceCode, `/api/webhooks/xendit${event ? `:${event}` : ''}`, JSON.stringify(payload), JSON.stringify(responsePayload), 200]);
+    } catch (err: any) {
+      console.error("payment_logs insert error:", err);
+      if (err.code === '23505' && err.constraint === 'payment_logs_pkey') {
+        query(`SELECT setval('payment_logs_id_seq', (SELECT MAX(id) FROM payment_logs))`).catch(() => {});
+      }
+    }
 
     // REAL-TIME UPDATES & WORKFLOW
     if (newStatus === 'PAID') {

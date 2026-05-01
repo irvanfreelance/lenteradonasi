@@ -387,7 +387,12 @@ export async function POST(req: Request) {
       JSON.stringify(parsed), 
       JSON.stringify({ payment_gateway_response: xenditResponseData, client_response: finalResponse }), 
       200
-    ]).catch(err => console.error("Async payment_logs insert error:", err));
+    ]).catch(err => {
+      console.error("Async payment_logs insert error:", err);
+      if (err.code === '23505' && err.constraint === 'payment_logs_pkey') {
+        query(`SELECT setval('payment_logs_id_seq', (SELECT MAX(id) FROM payment_logs))`).catch(() => {});
+      }
+    });
 
     return NextResponse.json(finalResponse);
 
