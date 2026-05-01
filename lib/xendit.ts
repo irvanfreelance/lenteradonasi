@@ -70,7 +70,7 @@ export async function createXenditPaymentRequest({
     payload.payment_method.ewallet = {
       channel_code: channelCode,
       channel_properties: {
-        success_return_url: successReturnUrl || `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${externalId}`
+        success_return_url: successReturnUrl || `${process.env.NEXT_PUBLIC_BASE_URL}/status/${externalId}`
       }
     };
     if (formattedPhone) {

@@ -180,7 +180,7 @@ export async function POST(req: Request) {
         customerName: name,
         customerEmail: email || undefined,
         customerPhone: phone || undefined,
-        successReturnUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${invoiceCode}`
+        successReturnUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/status/${invoiceCode}`
       });
 
       xenditPaymentRequestId = xenditResponseData.id;

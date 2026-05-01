@@ -257,16 +257,18 @@ export default function CheckoutProfile() {
                 <p className="text-[9px] text-gray-400 mt-1.5 italic">Nomor WhatsApp dan Email diperlukan untuk pengiriman notifikasi.</p>
               </div>
 
-              <label className="flex items-center justify-between border-t border-gray-100 pt-4 mt-2 cursor-pointer group">
+              <div 
+                className="flex items-center justify-between border-t border-gray-100 pt-4 mt-2 cursor-pointer group"
+                onClick={() => setIsAnonymous(!isAnonymous)}
+              >
                 <div>
                   <p className="text-[13px] font-bold text-gray-800">Sembunyikan nama saya</p>
                   <p className="text-[10px] text-gray-500 italic mt-0.5">Tampil sebagai Hamba Allah</p>
                 </div>
                 <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${isAnonymous ? 'border-transparent' : 'bg-white border-gray-300 group-hover:border-gray-400'}`} style={{ backgroundColor: isAnonymous ? 'var(--color-teal-500, #0d9488)' : undefined }}>
-                  <input type="checkbox" className="sr-only" checked={isAnonymous} onChange={(e) => setIsAnonymous(e.target.checked)} />
                   {isAnonymous && <Check size={16} className="text-white" strokeWidth={4} />}
                 </div>
-              </label>
+              </div>
 
               {hasSavedData && (
                 <button

@@ -23,6 +23,18 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
 
   const isManual = invoice.payment_method_name?.toLowerCase().includes('manual') || invoice.va_number === '7123456789';
 
+  // Auto-redirect for Xendit e-wallets
+  useEffect(() => {
+    if (invoice?.payment_url) {
+      const pmType = invoice.payment_method_type?.toLowerCase() || '';
+      const provider = invoice.payment_provider?.toLowerCase() || '';
+      const isEwallet = pmType.includes('e_wallet') || pmType.includes('ewallet') || pmType.includes('e-wallet');
+      if (isEwallet && provider === 'xendit') {
+        window.location.href = invoice.payment_url;
+      }
+    }
+  }, [invoice]);
+
   // Realtime countdown based on expire_at or created_at + 24h
   useEffect(() => {
     if (!invoice.created_at && !invoice.invoice_code?.startsWith('SIM-')) return;
