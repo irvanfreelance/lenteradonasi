@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     } catch (err: any) {
       console.error("payment_logs insert error:", err);
       if (err.code === '23505' && err.constraint === 'payment_logs_pkey') {
-        query(\`SELECT setval('payment_logs_id_seq', (SELECT MAX(id) FROM payment_logs))\`).catch(() => {});
+        query(`SELECT setval('payment_logs_id_seq', (SELECT MAX(id) FROM payment_logs))`).catch(() => {});
       }
     }
 
