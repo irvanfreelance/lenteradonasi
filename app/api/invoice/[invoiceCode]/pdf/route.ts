@@ -370,7 +370,7 @@ export async function GET(
 
     const pdf = await buildPdf(data);
 
-    return new Response(pdf, {
+    return new Response(pdf as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
