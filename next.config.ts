@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  // pdfkit must run in Node.js runtime (not bundled by webpack)
+  serverExternalPackages: ['pdfkit'],
   // Aggressive HTTP caching for static assets
   async headers() {
     return [

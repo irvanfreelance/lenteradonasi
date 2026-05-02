@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@types/pdfkit": "^0.17.6",
     "@upstash/qstash": "^2.10.1",
     "@upstash/redis": "^1.37.0",
     "@upstash/workflow": "^1.2.0",
@@ -21,6 +22,7 @@
     "midtrans-client": "^1.4.3",
     "next": "16.2.4",
     "next-auth": "^4.24.14",
+    "pdfkit": "^0.18.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0",
