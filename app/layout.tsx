@@ -5,6 +5,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import { query } from "@/lib/db";
 import { redis } from "@/lib/redis";
 import TrackingScripts from "@/components/TrackingScripts";
+import { Providers } from "@/components/Providers";
 
 const sourceSansPro = Source_Sans_3({
   variable: "--font-source-sans-pro",
@@ -123,12 +124,14 @@ export default async function RootLayout({
             googleAnalyticId={configs.google_analytic_id}
           />
         )}
-        <main className="flex-1 w-full max-w-md mx-auto relative overflow-hidden bg-white shadow-xl flex flex-col">
-          <div className="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
-            {children}
-          </div>
-          <BottomNav />
-        </main>
+        <Providers>
+          <main className="flex-1 w-full max-w-md mx-auto relative overflow-hidden bg-white shadow-xl flex flex-col">
+            <div className="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
+              {children}
+            </div>
+            <BottomNav />
+          </main>
+        </Providers>
       </body>
     </html>
   );

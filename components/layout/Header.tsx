@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Heart, User, ChevronLeft } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 interface HeaderProps {
   isSearching?: boolean;
@@ -16,6 +17,7 @@ interface HeaderProps {
 
 export default function Header({ isSearching, onBackSearch, title, subtitle, logoUrl, ngoName }: HeaderProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   return (
     <div className="bg-white px-5 pt-8 pb-4 flex items-center sticky top-0 z-20 shadow-sm border-b border-gray-100">
@@ -59,8 +61,11 @@ export default function Header({ isSearching, onBackSearch, title, subtitle, log
             </div>
           )}
         </div>
-        <Link href="/profil" className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 border border-gray-100 hover:bg-teal-50 hover:text-teal-600 transition-colors">
+        <Link href={session ? "/profil" : "/login"} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 border border-gray-100 hover:bg-teal-50 hover:text-teal-600 transition-colors relative">
           <User size={20} />
+          {session && (
+             <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></span>
+          )}
         </Link>
       </div>
     </div>

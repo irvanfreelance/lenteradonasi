@@ -1,89 +1,119 @@
 import React from 'react';
-import Link from 'next/link';
-import { ChevronLeft, User, Wallet, History, ChevronRight, LogOut } from 'lucide-react';
-import { formatIDR } from '@/lib/utils';
+import Header from '@/components/layout/Header';
+import { User, Phone, Mail, Award, CheckCircle2 } from 'lucide-react';
+import { query } from '@/lib/db';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../api/auth/[...nextauth]/route';
+import { redirect } from 'next/navigation';
+import LogoutButton from './LogoutButton';
 
-export const revalidate = 0;
-
-async function getProfile() {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/user/profile?email=andi@email.com`, { cache: 'no-store' });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.data;
+async function getProfileData(donorId: string) {
+  try {
+    const res = await query(
+      `SELECT name, email, phone, is_anonymous_default, created_at FROM donors WHERE id = $1 LIMIT 1`,
+      [donorId]
+    );
+    return res.length > 0 ? res[0] : null;
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    return null;
+  }
 }
 
 export default async function ProfilPage() {
-  const isLoggedIn = true;
-  const profile = await getProfile();
+  const session = await getServerSession(authOptions);
 
-  if (!isLoggedIn || !profile) {
+  if (!session || !session.user || !(session.user as any).id) {
+    redirect('/login');
+  }
+
+  const donorId = (session.user as any).id;
+  const profile = await getProfileData(donorId);
+
+  if (!profile) {
     return (
       <div className="flex flex-col h-full bg-slate-50 relative pb-24">
-        <div className="bg-white p-4 flex items-center border-b border-gray-100 shadow-sm z-10 sticky top-0">
-          <Link href="/" className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
-            <ChevronLeft size={24} />
-          </Link>
-          <h2 className="font-bold text-lg text-gray-800 ml-2">Masuk Akun</h2>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col justify-center items-center text-center">
-          <div className="w-24 h-24 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 mb-6 shadow-inner">
-            <User size={48} />
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Pantau Jejak Kebaikanmu</h2>
-        </div>
+        <Header subtitle="Profil Akun" />
+        <div className="p-5 flex justify-center mt-10 text-gray-500 text-sm">Data profil tidak ditemukan.</div>
       </div>
     );
   }
 
+  const joinDate = new Intl.DateTimeFormat('id-ID', { year: 'numeric', month: 'long' }).format(new Date(profile.created_at || new Date()));
+
   return (
     <div className="flex flex-col h-full bg-slate-50 relative pb-24">
-      <div className="bg-gradient-to-br from-teal-600 to-teal-800 pt-10 pb-20 px-5 rounded-b-[2.5rem] relative shadow-lg">
-        <div className="absolute top-5 left-5 z-20">
-          <Link href="/" className="w-8 h-8 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white cursor-pointer hover:bg-white/30 transition-colors">
-            <ChevronLeft size={20} />
-          </Link>
-        </div>
-        <h1 className="text-xl font-bold text-white mb-6 text-center relative z-10">Profil Akun</h1>
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-16 h-16 bg-white rounded-full p-1 shadow-md">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Andi&backgroundColor=e2e8f0" alt="Avatar" className="w-full h-full rounded-full bg-gray-100" />
-          </div>
-          <div className="text-white">
-            <h2 className="font-bold text-lg mb-0.5">{profile.name}</h2>
-            <p className="text-teal-100 text-xs mb-1.5">{profile.email}</p>
-            <span className="bg-white/20 text-[10px] px-2 py-0.5 rounded backdrop-blur-sm font-medium">{profile.campaignsSupported} Kampanye didukung</span>
-          </div>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto pb-24 px-5 -mt-8 relative z-20 no-scrollbar">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden mb-5">
-          {[{ icon: User, label: `Total Donasi: ${formatIDR(Number(profile.totalDonated))}`, color: 'text-blue-500', bg: 'bg-blue-50' }, 
-            { icon: Wallet, label: `Level: ${profile.level}`, color: 'text-purple-500', bg: 'bg-purple-50' }, 
-            { icon: History, label: 'Riwayat Transaksi Lengkap', color: 'text-teal-500', bg: 'bg-teal-50', link: '/donasi' }
-          ].map((item, i) => {
-            const content = (
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.bg} ${item.color}`}><item.icon size={20} /></div>
-                <span className="font-semibold text-gray-700 text-sm">{item.label}</span>
+      <Header subtitle="Profil Akun" />
+      
+      <div className="flex-1 overflow-y-auto px-5 pt-6 no-scrollbar">
+        {/* Profile Card */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-teal-500 to-emerald-400"></div>
+          
+          <div className="relative pt-8 flex flex-col items-center">
+            <div className="w-24 h-24 rounded-full bg-white p-1 shadow-md mb-4 relative">
+              <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-teal-600 border border-gray-200 overflow-hidden">
+                {session.user.image ? (
+                  <img src={session.user.image} alt={profile.name} className="w-full h-full object-cover" />
+                ) : (
+                  <User size={40} className="text-gray-400" />
+                )}
               </div>
-            );
+              <div className="absolute bottom-1 right-1 w-6 h-6 bg-teal-500 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
+                <CheckCircle2 size={12} className="text-white" />
+              </div>
+            </div>
             
-            return item.link ? (
-               <Link href={item.link} key={i} className={`flex items-center justify-between p-4 ${i !== 2 ? 'border-b border-gray-50' : ''} cursor-pointer hover:bg-gray-50 transition-colors`}>
-                  {content}
-                  <ChevronRight size={18} className="text-gray-300" />
-               </Link>
-            ) : (
-              <div key={i} className={`flex items-center justify-between p-4 ${i !== 2 ? 'border-b border-gray-50' : ''}`}>
-                {content}
-              </div>
-            );
-          })}
+            <h2 className="text-xl font-bold text-gray-900 mb-1">{profile.name}</h2>
+            <div className="flex items-center text-sm text-gray-500 mb-4 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+              <Award size={14} className="mr-1.5 text-yellow-500" />
+              Bergabung sejak {joinDate}
+            </div>
+          </div>
         </div>
-        <button className="w-full flex items-center justify-center gap-2 bg-rose-50 text-rose-500 font-bold py-4 rounded-2xl">
-          <LogOut size={20} />Keluar Akun
-        </button>
+
+        {/* Data Diri */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
+          <h3 className="font-bold text-gray-800 mb-5">Data Diri</h3>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
+                <User size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Nama Lengkap</p>
+                <p className="text-sm font-medium text-gray-800">{profile.name}</p>
+              </div>
+            </div>
+            
+            <div className="w-full h-px bg-gray-50"></div>
+            
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-teal-500 shrink-0">
+                <Mail size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Email</p>
+                <p className="text-sm font-medium text-gray-800">{profile.email}</p>
+              </div>
+            </div>
+            
+            <div className="w-full h-px bg-gray-50"></div>
+            
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 shrink-0">
+                <Phone size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">No. Handphone</p>
+                <p className="text-sm font-medium text-gray-800">{profile.phone || '-'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <LogoutButton />
       </div>
     </div>
   );
