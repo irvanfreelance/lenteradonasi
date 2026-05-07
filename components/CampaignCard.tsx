@@ -7,10 +7,15 @@ import { Clock } from 'lucide-react';
 export default function CampaignCard({ camp, variant = 'default' }: { camp: any, variant?: 'default' | 'urgent' }) {
   if (variant === 'urgent') {
     return (
-      <Link href={`/kampanye/${camp.slug}`} prefetch={true} className="min-w-[75%] bg-white rounded-2xl shadow-sm border border-rose-50 overflow-hidden cursor-pointer snap-center block">
-        <div className="h-32 w-full relative">
-          <Image src={camp.image_url || '/placeholder.jpg'} alt={camp.title} fill sizes="(max-width: 768px) 100vw, 400px" className="object-cover" />
-          <div className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm">
+      <Link href={`/kampanye/${camp.slug}`} prefetch={true} className="min-w-[75%] bg-white rounded-xl shadow-sm border border-rose-50 overflow-hidden cursor-pointer snap-center block">
+        <div className="h-32 w-full relative bg-gray-900 overflow-hidden">
+          {/* Blurred Background */}
+          <div className="absolute inset-0 scale-110 blur-xl opacity-30">
+            <Image src={camp.image_url || '/placeholder.jpg'} alt="" fill className="object-cover" />
+          </div>
+          {/* Main Utuh Image */}
+          <Image src={camp.image_url || '/placeholder.jpg'} alt={camp.title} fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain relative z-10" />
+          <div className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm z-20">
             <Clock size={10} /> Sisa {camp.daysLeft} Hari
           </div>
         </div>
@@ -29,9 +34,14 @@ export default function CampaignCard({ camp, variant = 'default' }: { camp: any,
   }
 
   return (
-    <Link href={`/kampanye/${camp.slug}`} prefetch={true} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 flex gap-4 hover:border-teal-100 block">
-      <div className="w-28 h-28 rounded-xl overflow-hidden shrink-0 relative shadow-sm">
-        <Image src={camp.image_url || '/placeholder.jpg'} alt={camp.title} fill sizes="(max-width: 768px) 112px, 112px" className="object-cover" />
+    <Link href={`/kampanye/${camp.slug}`} prefetch={true} className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex gap-4 hover:border-teal-100 block">
+      <div className="w-28 h-28 rounded-lg overflow-hidden shrink-0 relative shadow-sm bg-gray-50 flex items-center justify-center">
+        {/* Blurred Background */}
+        <div className="absolute inset-0 scale-110 blur-md opacity-20">
+          <Image src={camp.image_url || '/placeholder.jpg'} alt="" fill className="object-cover" />
+        </div>
+        {/* Main Utuh Image */}
+        <Image src={camp.image_url || '/placeholder.jpg'} alt={camp.title} fill sizes="(max-width: 768px) 112px, 112px" className="object-contain relative z-10" />
       </div>
       <div className="flex-1 flex flex-col justify-between py-1">
         <div>

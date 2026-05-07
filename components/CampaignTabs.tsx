@@ -66,12 +66,16 @@ export default function CampaignTabs({ slug, description, updates }: Props) {
       {/* Cerita */}
       <div className={activeTab === 'cerita' ? '' : 'hidden'}>
         <h3 className="font-bold text-gray-800 mb-3 text-lg">Cerita Penggalangan Dana</h3>
-        <p className="text-gray-600 text-sm leading-relaxed text-justify mb-6 whitespace-pre-line">
-          {description}
-          {'\n\n'}
-          Donasi Anda sangat berarti. Mari kita bersama-sama mewujudkan kebaikan ini sekarang juga.
-          Berapapun donasi Anda akan sangat membantu tujuan mulia ini.
-        </p>
+        <div 
+          className="text-gray-600 text-sm leading-relaxed text-justify mb-4 campaign-description prose prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ __html: description }}
+        />
+        <div className="bg-teal-50/50 p-3.5 rounded-lg border border-teal-100/50 mb-4">
+          <p className="text-teal-800 text-[11px] leading-relaxed font-medium">
+            Donasi Anda sangat berarti. Mari kita bersama-sama mewujudkan kebaikan ini sekarang juga. 
+            Berapapun donasi Anda akan sangat membantu tujuan mulia ini.
+          </p>
+        </div>
       </div>
 
       {/* Info Terbaru */}

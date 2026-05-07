@@ -6,12 +6,20 @@ export const revalidate = 300; // ISR: payment methods cached for 5 min
 
 async function getPaymentMethods() {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/payment-methods`, {
-    next: { revalidate: 300 } // ISR cache
-  });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data || [];
+  try {
+    const res = await fetch(`${baseUrl}/api/payment-methods`, {
+      next: { revalidate: 300 } // ISR cache
+    });
+    if (!res.ok) {
+      console.error(`Failed to fetch payment methods: ${res.status}`);
+      return [];
+    }
+    const json = await res.json();
+    return json.data || [];
+  } catch (error) {
+    console.error('getPaymentMethods error:', error);
+    return [];
+  }
 }
 
 export default async function PaymentPage() {

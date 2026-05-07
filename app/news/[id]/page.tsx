@@ -8,13 +8,19 @@ export const dynamic = 'force-dynamic';
 
 async function getUpdateDetail(id: string) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/news/${id}`, { next: { revalidate: 60 } });
-  if (!res.ok) {
-    if (res.status === 404) return null;
-    throw new Error('Failed to fetch news detail');
+  try {
+    const res = await fetch(`${baseUrl}/api/news/${id}`, { next: { revalidate: 60 } });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      console.error(`Failed to fetch news detail for ${id}: ${res.status}`);
+      throw new Error(`Failed to fetch news detail: ${res.status}`);
+    }
+    const json = await res.json();
+    return json.data;
+  } catch (error) {
+    console.error(`Error in getUpdateDetail for ${id}:`, error);
+    throw error;
   }
-  const json = await res.json();
-  return json.data;
 }
 
 export default async function NewsDetailPage(props: { params: Promise<{ id: string }> }) {

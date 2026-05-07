@@ -7,10 +7,18 @@ export const dynamic = 'force-dynamic';
 
 async function getUpdates() {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/news`, { next: { revalidate: 60 } });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data;
+  try {
+    const res = await fetch(`${baseUrl}/api/news`, { next: { revalidate: 60 } });
+    if (!res.ok) {
+      console.error(`Failed to fetch updates: ${res.status}`);
+      return [];
+    }
+    const json = await res.json();
+    return json.data;
+  } catch (error) {
+    console.error('getUpdates error:', error);
+    return [];
+  }
 }
 
 export default async function NewsPage() {
