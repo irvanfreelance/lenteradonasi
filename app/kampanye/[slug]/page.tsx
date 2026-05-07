@@ -9,6 +9,7 @@ import AffiliateTracker from "@/components/AffiliateTracker";
 import CampaignTabs from "@/components/CampaignTabs";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { getCampaignBySlug, getAllCampaigns } from "@/lib/campaigns";
 
 export const revalidate = 60;
 
@@ -44,40 +45,20 @@ export async function generateMetadata(
 }
 
 async function getCampaignDetail(slug: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  
   try {
-    const res = await fetch(`${baseUrl}/api/campaigns/${slug}`, { 
-      next: { revalidate: 60 },
-      cache: 'no-store' // Ensure we get fresh data if it's failing
-    });
-
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      const text = await res.text();
-      console.error(`Failed to fetch campaign detail for ${slug}: ${res.status} ${res.statusText}`, text.slice(0, 200));
-      throw new Error(`Failed to fetch campaign detail: ${res.status}`);
-    }
-
-    const json = await res.json();
-    return json.data;
+    // DIRECT SERVICE CALL: Supercepat anti-delay, bypasses HTTP overhead
+    const campaign = await getCampaignBySlug(slug);
+    return campaign;
   } catch (error) {
     console.error(`Error in getCampaignDetail for ${slug}:`, error);
-    throw error;
+    return null;
   }
 }
 
 // Pre-generate the top 20 campaigns as static pages at build time
 export async function generateStaticParams() {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/campaigns`, { next: { revalidate: 300 } });
-    if (!res.ok) {
-      console.warn(`generateStaticParams: Failed to fetch campaigns list: ${res.status}`);
-      return [];
-    }
-    const json = await res.json();
-    const campaigns: any[] = json.data || [];
+    const campaigns = await getAllCampaigns();
     return campaigns.slice(0, 20).map((c: any) => ({ slug: c.slug }));
   } catch (error) {
     console.error('generateStaticParams error:', error);

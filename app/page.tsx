@@ -9,50 +9,14 @@ import CampaignCard from "@/components/CampaignCard";
 import CategoryGrid from "@/components/CategoryGrid";
 import Header from "@/components/layout/Header";
 import AutoCarousel from "@/components/AutoCarousel";
+import { getAllCampaigns } from "@/lib/campaigns";
 
 
 async function getData(searchQ?: string) {
-  // 1. Fetch campaigns directly
-  const cacheKeyCamp = searchQ ? `api:campaigns:search:${searchQ.toLowerCase()}` : `api:campaigns:all`;
-  let campaignsData = await redis.get(cacheKeyCamp);
+  // 1. Fetch campaigns using optimized service with real-time Redis stats
+  const campaigns = await getAllCampaigns(searchQ);
   
-  if (!campaignsData) {
-    let text = `
-      SELECT c.*, 
-             cat.name as category_name,
-             COALESCE(cs.collected_amount, 0) as collected, 
-             COALESCE(cs.donor_count, 0) as donors
-      FROM campaigns c
-      LEFT JOIN campaign_stats cs ON c.id = cs.campaign_id
-      LEFT JOIN categories cat ON c.category_id = cat.id
-      WHERE c.status = 'ACTIVE'
-    `;
-    const params: any[] = [];
-    if (searchQ) {
-      text += ` AND (c.title ILIKE $1 OR cat.name ILIKE $1)`;
-      params.push(`%${searchQ}%`);
-    }
-    text += ` ORDER BY c.sort ASC, c.created_at DESC`;
-    const rawCampaigns = await query(text, params);
-    
-    const processed = rawCampaigns.map(c => {
-      let daysLeft = 0;
-      if (c.end_date) {
-        const diff = new Date(c.end_date).getTime() - new Date().getTime();
-        daysLeft = Math.max(0, Math.ceil(diff / (1000 * 3600 * 24)));
-      }
-      return {
-        ...c,
-        daysLeft,
-        progress: c.has_no_target ? 0 : Math.min(100, Math.round(((Number(c.collected) || 0) / (Number(c.target_amount) || 1)) * 100))
-      };
-    });
-    const payload = { data: processed };
-    await redis.set(cacheKeyCamp, JSON.stringify(payload), { ex: 60 });
-    campaignsData = payload as any;
-  } else if (typeof campaignsData === 'string') {
-    campaignsData = JSON.parse(campaignsData) as any;
-  }
+  // 2. Fetch categories directly (could also be moved to a service later)
 
   // 2. Fetch categories directly
   const cacheKeyCat = `api:categories:all`;
@@ -82,7 +46,7 @@ async function getData(searchQ?: string) {
   }
 
   return { 
-    campaigns: (campaignsData as any).data || [], 
+    campaigns: campaigns || [], 
     categories: (categoriesData as any).data || [],
     configs: configsData
   };
