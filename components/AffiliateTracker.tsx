@@ -1,32 +1,32 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 
 /**
- * Invisible client component that captures the ?aff= query param.
- * Session is stored **per campaign** under key `lenteradonasi_affiliate_{campaignId}`,
- * so a new ?aff= on the same campaign always overwrites the previous affiliate,
- * while sessions for other campaigns are untouched.
+ * Invisible client component that captures the affiliate code.
+ * The `affCode` is passed directly from the server page (via searchParams)
+ * so we don't need useSearchParams() — no Suspense boundary needed.
  *
- * Usage: mount this on the campaign detail page (server component wraps it
- * in <Suspense> because useSearchParams requires it).
+ * Session is stored **per campaign** under key `lenteradonasi_affiliate_{campaignId}`.
+ * A new affCode for the same campaign always overwrites the old one.
  */
-export default function AffiliateTracker({ campaignId }: { campaignId: number }) {
-  const searchParams = useSearchParams();
-
+export default function AffiliateTracker({
+  campaignId,
+  affCode,
+}: {
+  campaignId: number;
+  affCode: string | null;
+}) {
   useEffect(() => {
-    const affCode = searchParams.get('aff');
     if (!affCode || !campaignId) return;
 
     const lsKey = `lenteradonasi_affiliate_${campaignId}`;
 
-    // Resolve code → id
     fetch(`/api/affiliates/resolve?code=${encodeURIComponent(affCode)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (json?.data?.id) {
-          // Always overwrite — newest ?aff= wins for this campaign
+          // Always overwrite — newest affCode wins for this campaign
           localStorage.setItem(
             lsKey,
             JSON.stringify({
@@ -38,7 +38,9 @@ export default function AffiliateTracker({ campaignId }: { campaignId: number })
         }
       })
       .catch(() => {/* silently ignore */});
-  }, [searchParams, campaignId]);
+  // Only run when affCode or campaignId changes (i.e., on page load with a valid ?aff=)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [affCode, campaignId]);
 
   return null;
 }

@@ -7,7 +7,6 @@ import { formatIDR } from "@/lib/utils";
 import ShareButton from "@/components/ShareButton";
 import AffiliateTracker from "@/components/AffiliateTracker";
 import CampaignTabs from "@/components/CampaignTabs";
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getCampaignBySlug, getAllCampaigns } from "@/lib/campaigns";
 
@@ -68,8 +67,11 @@ export async function generateStaticParams() {
 
 export default async function CampaignDetail(props: {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ aff?: string }>;
 }) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
+  const affCode = searchParams?.aff?.trim() || null;
   const campaign = await getCampaignDetail(params.slug);
 
   if (!campaign) notFound();
@@ -80,10 +82,8 @@ export default async function CampaignDetail(props: {
 
   return (
     <div className="flex flex-col h-full bg-white relative">
-      {/* Capture ?aff= query param — invisible, no UI */}
-      <Suspense fallback={null}>
-        <AffiliateTracker campaignId={campaign.id} />
-      </Suspense>
+      {/* Capture ?aff= affiliate code — resolved client-side, no UI */}
+      <AffiliateTracker campaignId={campaign.id} affCode={affCode} />
 
       <div className="relative h-72 w-full shrink-0 bg-gray-900 overflow-hidden">
         {/* Blurred Background Layer for "Whole Image" aesthetic */}

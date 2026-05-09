@@ -19,15 +19,25 @@ async function getData(searchQ?: string) {
   // 2. Fetch categories directly (could also be moved to a service later)
 
   // 2. Fetch categories directly
-  const cacheKeyCat = `api:categories:all`;
+  const cacheKeyCat = `api:categories:all_v3`;
   let categoriesData = await redis.get(cacheKeyCat);
   if (!categoriesData) {
     const cats = await query(`SELECT * FROM categories WHERE is_active = true ORDER BY id ASC`);
     const payload = { data: cats };
-    await redis.set(cacheKeyCat, JSON.stringify(payload), { ex: 120 });
+    await redis.set(cacheKeyCat, JSON.stringify(payload)); // Forever TTL
     categoriesData = payload as any;
   } else if (typeof categoriesData === 'string') {
     categoriesData = JSON.parse(categoriesData) as any;
+  }
+
+  // 2.5 Fetch Carousel Campaigns (Cached Forever)
+  const cacheKeyCarousel = `api:campaigns:carousel_v1`;
+  let carouselCampaigns = await redis.get(cacheKeyCarousel);
+  if (!carouselCampaigns) {
+    carouselCampaigns = campaigns.slice(0, 5);
+    await redis.set(cacheKeyCarousel, JSON.stringify(carouselCampaigns)); // Forever TTL
+  } else if (typeof carouselCampaigns === 'string') {
+    carouselCampaigns = JSON.parse(carouselCampaigns);
   }
 
   // 3. Fetch configs
@@ -47,6 +57,7 @@ async function getData(searchQ?: string) {
 
   return { 
     campaigns: campaigns || [], 
+    carouselCampaigns: (carouselCampaigns as any) || [],
     categories: (categoriesData as any).data || [],
     configs: configsData
   };
@@ -57,7 +68,7 @@ export default async function Home(props: { searchParams?: Promise<{ [key: strin
   const q = typeof searchParams?.q === 'string' ? searchParams.q : undefined;
   const isSearching = !!q;
   
-  const { campaigns: allCampaigns, categories, configs } = await getData(q);
+  const { campaigns: allCampaigns, carouselCampaigns, categories, configs } = await getData(q);
   const urgentCampaigns = allCampaigns.filter((c: any) => c.is_urgent && !isSearching);
 
   return (
@@ -70,10 +81,10 @@ export default async function Home(props: { searchParams?: Promise<{ [key: strin
       {!isSearching && (
         <>
           {/* Banners Carousel */}
-          <AutoCarousel campaigns={allCampaigns.slice(0, 5)} />
+          <AutoCarousel campaigns={carouselCampaigns} />
 
           {/* Categories */}
-          <div className="px-5 mt-6 mb-8">
+          <div className="px-5 mt-8 mb-8">
             <h2 className="font-bold text-gray-800 text-base mb-4">Kategori Pilihan</h2>
             <CategoryGrid categories={categories} />
           </div>

@@ -72,7 +72,8 @@ export async function POST(req: Request) {
       try {
         // 1. Fetch details for Redis & Workflow
         const invoiceDetails = await query(`
-          SELECT i.id, i.base_amount, i.total_amount, i.donor_name_snapshot, i.is_anonymous, i.doa,
+          SELECT i.id, i.created_at, i.base_amount, i.total_amount,
+                 i.donor_name_snapshot, i.is_anonymous, i.doa,
                  t.campaign_id, t.affiliate_id,
                  c.slug
           FROM invoices i
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
 
         if (invoiceDetails.length > 0) {
           const detail = invoiceDetails[0];
-          const { campaign_id, affiliate_id, base_amount, total_amount, donor_name_snapshot, is_anonymous, doa, slug } = detail;
+          const { id: invoiceId, created_at: invoiceCreatedAt, campaign_id, affiliate_id, base_amount, total_amount, donor_name_snapshot, is_anonymous, doa, slug } = detail;
 
           // 2. Immediate Redis Update (Stats)
           const statsKey = `campaign:${campaign_id}:stats`;
@@ -121,6 +122,8 @@ export async function POST(req: Request) {
               url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/workflow/affiliate-commission`,
               body: {
                 invoiceCode,
+                invoiceId,
+                invoiceCreatedAt,
                 campaignId: campaign_id,
                 affiliateId: affiliate_id,
                 baseAmount: Number(base_amount),
