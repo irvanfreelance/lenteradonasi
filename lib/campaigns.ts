@@ -91,8 +91,32 @@ export async function getAllCampaigns(searchQ?: string | null) {
   
   const rawCampaigns = await query(text, params);
   
-  // Merge Redis stats for each campaign
-  const campaigns = await Promise.all(rawCampaigns.map(async (c) => {
+  const campaigns = await mergeRedisStats(rawCampaigns);
+
+  return campaigns;
+}
+
+export async function getCarouselCampaigns() {
+  const rawCampaigns = await query(`
+    SELECT c.*, 
+           cat.name as category_name,
+           COALESCE(cs.collected_amount, 0) as collected, 
+           COALESCE(cs.donor_count, 0) as donors
+    FROM campaigns c
+    LEFT JOIN campaign_stats cs ON c.id = cs.campaign_id
+    LEFT JOIN categories cat ON c.category_id = cat.id
+    WHERE c.status = 'ACTIVE' AND c.is_carousel = true
+    ORDER BY c.sort ASC
+  `);
+
+  return mergeRedisStats(rawCampaigns);
+}
+
+/**
+ * Shared logic to merge real-time Redis stats into campaign data
+ */
+async function mergeRedisStats(rawCampaigns: any[]) {
+  return await Promise.all(rawCampaigns.map(async (c) => {
     const statsKey = `campaign:${c.id}:stats`;
     const rtStats = await redis.hgetall(statsKey) as Record<string, string> | null;
     
@@ -118,6 +142,4 @@ export async function getAllCampaigns(searchQ?: string | null) {
       progress: c.has_no_target ? 0 : Math.min(100, Math.round(((collected || 0) / (Number(c.target_amount) || 1)) * 100))
     };
   }));
-
-  return campaigns;
 }

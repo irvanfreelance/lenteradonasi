@@ -9,7 +9,7 @@ import CampaignCard from "@/components/CampaignCard";
 import CategoryGrid from "@/components/CategoryGrid";
 import Header from "@/components/layout/Header";
 import AutoCarousel from "@/components/AutoCarousel";
-import { getAllCampaigns } from "@/lib/campaigns";
+import { getAllCampaigns, getCarouselCampaigns } from "@/lib/campaigns";
 
 
 async function getData(searchQ?: string) {
@@ -34,7 +34,7 @@ async function getData(searchQ?: string) {
   const cacheKeyCarousel = `api:campaigns:carousel_v1`;
   let carouselCampaigns = await redis.get(cacheKeyCarousel);
   if (!carouselCampaigns) {
-    carouselCampaigns = campaigns.slice(0, 5);
+    carouselCampaigns = await getCarouselCampaigns();
     await redis.set(cacheKeyCarousel, JSON.stringify(carouselCampaigns)); // Forever TTL
   } else if (typeof carouselCampaigns === 'string') {
     carouselCampaigns = JSON.parse(carouselCampaigns);
