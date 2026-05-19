@@ -17,8 +17,9 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
   
   // Upload States
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(invoice?.proof_transfer || null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isManual = invoice.payment_method_name?.toLowerCase().includes('manual') || invoice.va_number === '7123456789';
@@ -76,8 +77,12 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
   }, [invoice.created_at, invoice.invoice_code]);
 
   const handleCopyVa = () => {
-    if (invoice.va_number) {
-      const cleanVa = invoice.va_number.replace(/\s+/g, '');
+    let va = invoice.va_number || '';
+    if (isManual && va.includes('|')) {
+      va = va.split('|')[0];
+    }
+    if (va) {
+      const cleanVa = va.replace(/\s+/g, '');
       navigator.clipboard.writeText(cleanVa);
     }
     setCopiedVa(true);
@@ -103,16 +108,26 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
 
   const handleClearFile = () => {
     setSelectedFile(null);
-    setPreviewUrl(null);
+    setPreviewUrl(invoice?.proof_transfer || null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleSubmit = async () => {
+  const handleConfirmSubmit = () => {
+    if (isManual && selectedFile) {
+      setShowConfirmModal(true);
+    } else {
+      executeSubmit();
+    }
+  };
+
+  const executeSubmit = async () => {
+    setShowConfirmModal(false);
     // If not manual or no file selected, just simulate success redirect
     if (!isManual || !selectedFile) {
       router.push(`/status/${invoiceCode || 'SIM'}`);
+      router.refresh();
       return;
     }
 
@@ -142,9 +157,11 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
 
       // Upload success, go back to home or success
       router.push(`/status/${invoiceCode || 'SIM'}`);
+      router.refresh();
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan saat mengunggah foto. Silakan coba lagi.');
+    } finally {
       setIsUploading(false);
     }
   };
@@ -288,13 +305,21 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
             const isVA = pmType.includes('va') || pmType.includes('bank') || pmType.includes('transfer');
             const isManualLocal = pmType.includes('manual') || isManual;
 
+            let displayVa = invoice.va_number || 'Tidak tersedia';
+            let displayName = 'Yayasan Peduli Sesama';
+            if (isManualLocal && displayVa.includes('|')) {
+              const parts = displayVa.split('|');
+              displayVa = parts[0];
+              displayName = parts[1];
+            }
+
             return isVA || isManualLocal ? (
               <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
                 <p className="text-xs text-gray-500 mb-1 font-semibold">{isManualLocal ? 'Nomor Rekening' : 'Nomor Virtual Account'} ({invoice.payment_method_name})</p>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex flex-col">
-                    <span className="text-2xl font-bold tracking-wider text-gray-800">{invoice.va_number || 'Tidak tersedia'}</span>
-                    {isManualLocal && <span className="text-xs text-gray-500 font-medium mt-1">a/n Yayasan Peduli Sesama</span>}
+                    <span className="text-2xl font-bold tracking-wider text-gray-800">{displayVa}</span>
+                    {isManualLocal && <span className="text-xs text-gray-500 font-medium mt-1">a/n {displayName}</span>}
                   </div>
                   <button onClick={handleCopyVa} className="text-teal-600 bg-teal-50 p-2 shrink-0 rounded-lg hover:bg-teal-100 transition-colors active:scale-95" title="Salin">
                     <Copy size={18} />
@@ -431,15 +456,41 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white p-4 border-t border-gray-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] pb-safe z-20">
         <button 
-          onClick={handleSubmit}
-          disabled={isUploading || (isManual && !selectedFile)}
-          className={`w-full flex justify-center items-center gap-2 text-center text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-transform block ${isUploading || (isManual && !selectedFile) ? 'bg-gray-300 shadow-none cursor-not-allowed' : 'bg-teal-600 shadow-teal-600/20 active:scale-[0.98]'}`}
+          onClick={handleConfirmSubmit}
+          disabled={isUploading || (isManual && !selectedFile && !invoice?.proof_transfer)}
+          className={`w-full flex justify-center items-center gap-2 text-center text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-transform block ${isUploading || (isManual && !selectedFile && !invoice?.proof_transfer) ? 'bg-gray-300 shadow-none cursor-not-allowed' : 'bg-teal-600 shadow-teal-600/20 active:scale-[0.98]'}`}
         >
           {isUploading ? (
             <><Loader2 className="animate-spin" size={20} /> Memproses...</>
-          ) : isManual && !selectedFile ? 'Pilih Foto Dahulu' : 'Saya Sudah Bayar'}
+          ) : isManual && !selectedFile && !invoice?.proof_transfer ? 'Pilih Foto Dahulu' : isManual && invoice?.proof_transfer && !selectedFile ? 'Kembali ke Beranda' : isManual && selectedFile ? 'Unggah Bukti' : 'Saya Sudah Bayar'}
         </button>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
+            <h3 className="font-bold text-xl text-gray-800 mb-2 text-center">Konfirmasi Unggah</h3>
+            <p className="text-gray-600 text-sm text-center mb-6">
+              Apakah Anda yakin ingin mengirim bukti transfer ini? Pastikan gambar terlihat jelas dan sesuai dengan nominal tagihan.
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={executeSubmit}
+                className="flex-1 py-3 px-4 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center"
+              >
+                Yakin, Unggah
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hidden PDF Template - Rendered off-screen, captured by html-to-image */}
       <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none' }}>

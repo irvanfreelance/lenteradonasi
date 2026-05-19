@@ -76,9 +76,14 @@ export default function CheckoutProfile() {
   useEffect(() => {
     if (!checkoutData) return;
     if (typeof window !== 'undefined') {
-      if ((window as any).fbq) (window as any).fbq('track', 'AddToCart', { content_name: checkoutData.campaignTitle });
-      if ((window as any).ttq) (window as any).ttq.track('AddToCart', { content_name: checkoutData.campaignTitle });
-      if ((window as any).gtag) (window as any).gtag('event', 'add_to_cart', { items: [{ item_name: checkoutData.campaignTitle }] });
+      const config = (window as any).pixelEventsConfig?.find((e: any) => e.screen_name === 'checkout_profile');
+      const metaEvent = config?.meta_event || 'InitiateCheckout';
+      const tiktokEvent = config?.tiktok_event || 'InitiateCheckout';
+      const googleEvent = config?.google_event || 'begin_checkout';
+
+      if ((window as any).fbq) (window as any).fbq('track', metaEvent, { content_name: checkoutData.campaignTitle });
+      if ((window as any).ttq) (window as any).ttq.track(tiktokEvent, { content_name: checkoutData.campaignTitle });
+      if ((window as any).gtag) (window as any).gtag('event', googleEvent, { items: [{ item_name: checkoutData.campaignTitle }] });
     }
   }, [checkoutData]);
 

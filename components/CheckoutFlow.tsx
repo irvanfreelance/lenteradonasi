@@ -108,9 +108,14 @@ export default function CheckoutFlow({ campaign, variants, paymentMethods }: any
 
     // Tracking Event
     if (typeof window !== 'undefined') {
-      if ((window as any).fbq) (window as any).fbq('track', 'InitiateCheckout');
-      if ((window as any).ttq) (window as any).ttq.track('InitiateCheckout');
-      if ((window as any).gtag) (window as any).gtag('event', 'begin_checkout', { value: currentTotalAmount, currency: 'IDR' });
+      const config = (window as any).pixelEventsConfig?.find((e: any) => e.screen_name === 'checkout_profile');
+      const metaEvent = config?.meta_event || 'InitiateCheckout';
+      const tiktokEvent = config?.tiktok_event || 'InitiateCheckout';
+      const googleEvent = config?.google_event || 'begin_checkout';
+
+      if ((window as any).fbq) (window as any).fbq('track', metaEvent);
+      if ((window as any).ttq) (window as any).ttq.track(tiktokEvent);
+      if ((window as any).gtag) (window as any).gtag('event', googleEvent, { value: currentTotalAmount, currency: 'IDR' });
     }
 
     try {

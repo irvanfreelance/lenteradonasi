@@ -21,11 +21,21 @@ function TrackingLogic({ metaPixelId, tiktokPixelId, googleAdsId, googleAnalytic
     if (gclid) document.cookie = `gclid=${gclid}; path=/; max-age=${maxAge}`;
 
     // 2. Fire PageView Event on Route Change
-    if (metaPixelId && typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'PageView');
-    }
-    if (tiktokPixelId && typeof window !== 'undefined' && (window as any).ttq) {
-      (window as any).ttq.page();
+    if (typeof window !== 'undefined') {
+      const config = (window as any).pixelEventsConfig?.find((e: any) => e.screen_name === 'page_view');
+      const metaEvent = config?.meta_event || 'PageView';
+      const tiktokEvent = config?.tiktok_event || 'PageView';
+      
+      if (metaPixelId && (window as any).fbq) {
+        (window as any).fbq('track', metaEvent);
+      }
+      if (tiktokPixelId && (window as any).ttq) {
+        if (tiktokEvent === 'PageView') {
+          (window as any).ttq.page();
+        } else {
+          (window as any).ttq.track(tiktokEvent);
+        }
+      }
     }
   }, [searchParams, pathname, metaPixelId, tiktokPixelId]);
 

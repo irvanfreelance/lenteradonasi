@@ -74,22 +74,40 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   let configs = null;
+  let pixelEvents = null;
   try {
     // Cache ngo_configs in Redis – avoid DB hit on every render
-    const cacheKey = 'ngo:configs:global_v3';
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      configs = typeof cached === 'string' ? JSON.parse(cached) : cached;
+    const configCacheKey = 'ngo:configs:global_v3';
+    const pixelCacheKey = 'ngo:pixel_events:global_v1';
+    
+    const [cachedConfig, cachedPixels] = await Promise.all([
+      redis.get(configCacheKey),
+      redis.get(pixelCacheKey)
+    ]);
+    
+    if (cachedConfig) {
+      configs = typeof cachedConfig === 'string' ? JSON.parse(cachedConfig) : cachedConfig;
     } else {
       const res = await query('SELECT ngo_name, logo_url, primary_color, favicon_url, meta_pixel_id, tiktok_pixel_id, google_ads_id, google_analytic_id FROM ngo_configs LIMIT 1');
       if (res.length > 0) {
         configs = res[0];
-        // Cache for 1 hour – changes to tracking IDs are rare
-        redis.set(cacheKey, JSON.stringify(configs), { ex: 3600 }).catch(() => {});
+        // Cache for 1 hour
+        redis.set(configCacheKey, JSON.stringify(configs), { ex: 3600 }).catch(() => {});
+      }
+    }
+
+    if (cachedPixels) {
+      pixelEvents = typeof cachedPixels === 'string' ? JSON.parse(cachedPixels) : cachedPixels;
+    } else {
+      const resEvents = await query('SELECT screen_name, meta_event, tiktok_event, google_event FROM pixel_events WHERE is_active = true');
+      if (resEvents && resEvents.length > 0) {
+        pixelEvents = resEvents;
+        // Cache for 1 hour
+        redis.set(pixelCacheKey, JSON.stringify(pixelEvents), { ex: 3600 }).catch(() => {});
       }
     }
   } catch (e) {
-    console.error("Failed to fetch ngo_configs for tracking", e);
+    console.error("Failed to fetch ngo_configs or pixel_events for tracking", e);
   }
 
   return (
@@ -98,6 +116,13 @@ export default async function RootLayout({
         {/* Preconnect to Vercel Blob & Neon for faster cold starts */}
         <link rel="preconnect" href="https://public.blob.vercel-storage.com" />
         <link rel="dns-prefetch" href="https://public.blob.vercel-storage.com" />
+        {pixelEvents && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.pixelEventsConfig = ${JSON.stringify(pixelEvents)};`
+            }}
+          />
+        )}
         {configs?.primary_color && (
           <style dangerouslySetInnerHTML={{ __html: `
             :root {

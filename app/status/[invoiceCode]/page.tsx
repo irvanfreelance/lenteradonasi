@@ -42,9 +42,14 @@ export default async function StatusPage(props: { params: Promise<{ invoiceCode:
           dangerouslySetInnerHTML={{
             __html: `
               if (typeof window !== 'undefined') {
-                if (window.fbq) window.fbq('track', 'Purchase', { value: ${invoice.total_amount || 0}, currency: 'IDR' });
-                if (window.ttq) window.ttq.track('CompletePayment', { value: ${invoice.total_amount || 0}, currency: 'IDR' });
-                if (window.gtag) window.gtag('event', 'purchase', { transaction_id: '${invoice.invoice_code}', value: ${invoice.total_amount || 0}, currency: 'IDR' });
+                const config = window.pixelEventsConfig?.find(e => e.screen_name === 'purchase_success');
+                const metaEvent = config?.meta_event || 'Purchase';
+                const tiktokEvent = config?.tiktok_event || 'CompletePayment';
+                const googleEvent = config?.google_event || 'purchase';
+
+                if (window.fbq) window.fbq('track', metaEvent, { value: ${invoice.total_amount || 0}, currency: 'IDR' });
+                if (window.ttq) window.ttq.track(tiktokEvent, { value: ${invoice.total_amount || 0}, currency: 'IDR' });
+                if (window.gtag) window.gtag('event', googleEvent, { transaction_id: '${invoice.invoice_code}', value: ${invoice.total_amount || 0}, currency: 'IDR' });
               }
             `
           }}

@@ -96,9 +96,14 @@ export default function CheckoutPayment({ paymentMethods }: { paymentMethods: an
   useEffect(() => {
     if (!checkoutData) return;
     if (typeof window !== 'undefined') {
-      if ((window as any).fbq) (window as any).fbq('track', 'InitiateCheckout');
-      if ((window as any).ttq) (window as any).ttq.track('InitiateCheckout');
-      if ((window as any).gtag) (window as any).gtag('event', 'begin_checkout', { value: checkoutData.amount, currency: 'IDR' });
+      const config = (window as any).pixelEventsConfig?.find((e: any) => e.screen_name === 'checkout_payment');
+      const metaEvent = config?.meta_event || 'AddPaymentInfo';
+      const tiktokEvent = config?.tiktok_event || 'AddPaymentInfo';
+      const googleEvent = config?.google_event || 'add_payment_info';
+
+      if ((window as any).fbq) (window as any).fbq('track', metaEvent);
+      if ((window as any).ttq) (window as any).ttq.track(tiktokEvent);
+      if ((window as any).gtag) (window as any).gtag('event', googleEvent, { value: checkoutData.amount, currency: 'IDR' });
     }
   }, [checkoutData]);
 

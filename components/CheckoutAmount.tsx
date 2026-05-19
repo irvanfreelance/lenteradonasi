@@ -28,9 +28,14 @@ export default function CheckoutAmount({ campaign, variants }: any) {
   // Fire ViewContent ad event on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if ((window as any).fbq) (window as any).fbq('track', 'ViewContent', { content_name: campaign.title });
-      if ((window as any).ttq) (window as any).ttq.track('ViewContent', { content_name: campaign.title });
-      if ((window as any).gtag) (window as any).gtag('event', 'view_item', { items: [{ item_name: campaign.title }] });
+      const config = (window as any).pixelEventsConfig?.find((e: any) => e.screen_name === 'checkout_amount');
+      const metaEvent = config?.meta_event || 'ViewContent';
+      const tiktokEvent = config?.tiktok_event || 'ViewContent';
+      const googleEvent = config?.google_event || 'view_item';
+
+      if ((window as any).fbq) (window as any).fbq('track', metaEvent, { content_name: campaign.title });
+      if ((window as any).ttq) (window as any).ttq.track(tiktokEvent, { content_name: campaign.title });
+      if ((window as any).gtag) (window as any).gtag('event', googleEvent, { items: [{ item_name: campaign.title }] });
     }
   }, [campaign.title]);
 
