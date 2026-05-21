@@ -326,7 +326,16 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
 
             return isVA || isManualLocal ? (
               <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
-                <p className="text-xs text-gray-500 mb-1 font-semibold">{isManualLocal ? 'Nomor Rekening' : 'Nomor Virtual Account'} ({invoice.payment_method_name})</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500 font-semibold">{isManualLocal ? 'Nomor Rekening' : 'Nomor Virtual Account'} ({invoice.payment_method_name})</p>
+                  {invoice.payment_method_logo && (
+                    <img 
+                      src={invoice.payment_method_logo} 
+                      alt={invoice.payment_method_name} 
+                      className="h-5 max-w-[80px] object-contain rounded-md" 
+                    />
+                  )}
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex flex-col">
                     <span className="text-2xl font-bold tracking-wider text-gray-800">{displayVa}</span>
@@ -338,8 +347,17 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
                 </div>
               </div>
             ) : (pmType.includes('retail') || pmType.includes('outlet') || pmType.includes('over_the_counter')) ? (
-              <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-center">
-                <p className="text-xs text-gray-500 mb-3 font-semibold">Kode Pembayaran ({invoice.payment_method_name})</p>
+              <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-gray-500 font-semibold">Kode Pembayaran ({invoice.payment_method_name})</p>
+                  {invoice.payment_method_logo && (
+                    <img 
+                      src={invoice.payment_method_logo} 
+                      alt={invoice.payment_method_name} 
+                      className="h-5 max-w-[80px] object-contain rounded-md" 
+                    />
+                  )}
+                </div>
                 <h2 className="text-3xl font-black tracking-widest text-gray-800 mb-4">{invoice.va_number}</h2>
                 <div className="bg-white p-3 rounded-lg border border-gray-200 inline-block mb-3">
                   <img 
@@ -354,7 +372,16 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
               </div>
             ) : (pmType.includes('e_wallet') || pmType.includes('ewallet') || pmType.includes('e-wallet')) ? (
               <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
-                <p className="text-xs text-gray-500 mb-4 font-semibold">Bayar Menggunakan {invoice.payment_method_name}</p>
+                <div className="flex flex-col items-center gap-2 mb-4">
+                  {invoice.payment_method_logo && (
+                    <img 
+                      src={invoice.payment_method_logo} 
+                      alt={invoice.payment_method_name} 
+                      className="h-8 max-w-[100px] object-contain rounded-md mb-1" 
+                    />
+                  )}
+                  <p className="text-xs text-gray-500 font-semibold">Bayar Menggunakan {invoice.payment_method_name}</p>
+                </div>
                 {invoice.payment_url ? (
                   <a 
                     href={invoice.payment_url} 
@@ -372,7 +399,16 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
               </div>
             ) : (pmType.includes('qr') || pmType === 'qr_code') ? (
                <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-gray-300 relative text-center">
-                 <p className="text-xs text-gray-500 mb-4 font-semibold">Scan QR Code untuk Membayar</p>
+                 <div className="flex flex-col items-center gap-2 mb-4">
+                   {invoice.payment_method_logo && (
+                     <img 
+                       src={invoice.payment_method_logo} 
+                       alt={invoice.payment_method_name} 
+                       className="h-8 max-w-[100px] object-contain rounded-md mb-1" 
+                     />
+                   )}
+                   <p className="text-xs text-gray-500 font-semibold">Scan QR Code untuk Membayar</p>
+                 </div>
                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 inline-block">
                    {(() => {
                      let qrString = '';
@@ -508,7 +544,15 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
         <div id="pdf-template" style={{ width: '794px', background: 'white', color: '#1a1a1a', padding: '48px', fontFamily: 'Arial, sans-serif', fontSize: '13px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e5e7eb', paddingBottom: '20px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '48px', height: '48px', background: '#0d9488', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '20px' }}>L</div>
+              {invoice.ngoLogo ? (
+                <img 
+                  src={invoice.ngoLogo} 
+                  alt={invoice.ngoName || 'Lembaga'} 
+                  style={{ height: '48px', objectFit: 'contain' }} 
+                />
+              ) : (
+                <div style={{ width: '48px', height: '48px', background: '#0d9488', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '20px' }}>L</div>
+              )}
               <span style={{ fontWeight: '800', fontSize: '20px', color: '#0f766e' }}>{invoice.ngoName || 'Lembaga Kami'}</span>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -516,7 +560,16 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
               <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Created: {invoice.created_at ? new Date(invoice.created_at).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }) : '-'}</p>
             </div>
           </div>
-          <p style={{ fontWeight: '900', fontSize: '20px', fontStyle: 'italic', marginBottom: '24px' }}>{invoice.payment_method_name}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            {invoice.payment_method_logo && (
+              <img 
+                src={invoice.payment_method_logo} 
+                alt={invoice.payment_method_name} 
+                style={{ height: '32px', objectFit: 'contain', borderRadius: '4px' }} 
+              />
+            )}
+            <p style={{ fontWeight: '900', fontSize: '20px', fontStyle: 'italic', margin: 0 }}>{invoice.payment_method_name}</p>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid #e5e7eb', paddingBottom: '20px', marginBottom: '20px' }}>
             <div>
               <p style={{ fontSize: '13px', color: '#4b5563' }}>Dear <strong>{invoice.donor_name}</strong>,</p>
@@ -600,14 +653,15 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
           {isManual && invoice.total_amount && (() => {
             const amtStr = Number(invoice.total_amount).toString();
             const last3 = amtStr.length >= 3 ? amtStr.slice(-3) : amtStr;
+            const rest = amtStr.length >= 3 ? amtStr.slice(0, -3) : '';
+            const formattedRest = rest ? formatIDR(Number(rest)) : 'Rp ';
             return (
               <div style={{ marginBottom: '24px', padding: '12px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <div>
                   <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px', color: '#c2410c' }}>⚠ Pastikan Transfer Sesuai Nominal Termasuk 3 Digit Terakhir</p>
                   <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>Nominal yang harus ditransfer (termasuk kode unik):</p>
                   <p style={{ fontWeight: '900', fontSize: '20px', color: '#1a1a1a', letterSpacing: '1px' }}>
-                    {Number(invoice.total_amount).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
-                    <span style={{ background: '#fbbf24', padding: '0 4px', borderRadius: '4px', marginLeft: '8px', fontSize: '18px' }}>{last3}</span>
+                    {formattedRest.replace(',00', '')}.<span style={{ background: '#fbbf24', padding: '2px 4px', borderRadius: '4px' }}>{last3}</span>
                   </p>
                   <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>* 3 angka terakhir ({last3}) adalah kode unik yang membantu kami mengidentifikasi pembayaran Anda secara otomatis.</p>
                 </div>

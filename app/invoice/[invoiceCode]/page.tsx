@@ -16,6 +16,8 @@ async function getInvoice(invoiceCode: string) {
       payment_method_name: isManual ? 'Transfer Manual BSI' : 'BCA Virtual Account',
       payment_method_type: isManual ? 'manual' : 'va',
       payment_method_code: isManual ? 'BSI' : 'BCA',
+      payment_method_logo: isManual ? 'https://4jgsaomzelkwriht.public.blob.vercel-storage.com/mandiri-qHIfJdlwKGHQU020btV9Yhr0iUwo4G.png' : 'https://example.com/logo.png',
+      ngoLogo: 'https://4jgsaomzelkwriht.public.blob.vercel-storage.com/logo-ngo.png',
       payment_url: null,
       instructions: [
         {
@@ -67,18 +69,20 @@ async function getInvoice(invoiceCode: string) {
         pm.name as payment_method_name,
         pm.type as payment_method_type,
         pm.code as payment_method_code,
-        pm.provider as payment_provider
+        pm.provider as payment_provider,
+        pm.logo_url as payment_method_logo
       FROM "${targetTable}" i
       LEFT JOIN payment_methods pm ON i.payment_method_id = pm.id
       WHERE i.invoice_code = $1
     `, [invoiceCode]),
-    query(`SELECT ngo_name FROM ngo_configs LIMIT 1`),
+    query(`SELECT ngo_name, logo_url FROM ngo_configs LIMIT 1`),
   ]);
 
   if (invoices.length === 0) return null;
   const invoice = invoices[0];
 
   const ngoName = ngoConfigs.length > 0 ? ngoConfigs[0].ngo_name : 'Lembaga Kami';
+  const ngoLogo = ngoConfigs.length > 0 ? ngoConfigs[0].logo_url : null;
 
   // Parallel: instructions + line items
   const [instructions, lineItems] = await Promise.all([
@@ -97,7 +101,7 @@ async function getInvoice(invoiceCode: string) {
     `, [invoice.id]),
   ]);
 
-  const result = { ...invoice, instructions, lineItems, ngoName };
+  const result = { ...invoice, instructions, lineItems, ngoName, ngoLogo };
 
   // Normalize payment method type for frontend consistency
   const rawType = (result.payment_method_type || '').toLowerCase();
