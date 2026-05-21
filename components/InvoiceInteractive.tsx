@@ -24,6 +24,27 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
 
   const isManual = invoice.payment_method_name?.toLowerCase().includes('manual') || invoice.va_number === '7123456789';
 
+  let displayVa = invoice.va_number || '';
+  let displayName = 'Yayasan Peduli Sesama';
+
+  if (isManual) {
+    const manualSource = (invoice.va_number && invoice.va_number.includes('|'))
+      ? invoice.va_number
+      : (invoice.payment_method_code && invoice.payment_method_code.includes('|'))
+        ? invoice.payment_method_code
+        : null;
+
+    if (manualSource) {
+      const parts = manualSource.split('|');
+      displayVa = parts[0];
+      displayName = parts[1];
+    } else {
+      displayVa = invoice.va_number || invoice.payment_method_code || 'Tidak tersedia';
+    }
+  } else {
+    displayVa = displayVa || 'Tidak tersedia';
+  }
+
   // Auto-redirect for Xendit e-wallets
   useEffect(() => {
     if (invoice?.payment_url) {
@@ -77,12 +98,8 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
   }, [invoice.created_at, invoice.invoice_code]);
 
   const handleCopyVa = () => {
-    let va = invoice.va_number || '';
-    if (isManual && va.includes('|')) {
-      va = va.split('|')[0];
-    }
-    if (va) {
-      const cleanVa = va.replace(/\s+/g, '');
+    if (displayVa && displayVa !== 'Tidak tersedia') {
+      const cleanVa = displayVa.replace(/\s+/g, '');
       navigator.clipboard.writeText(cleanVa);
     }
     setCopiedVa(true);
@@ -305,13 +322,7 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
             const isVA = pmType.includes('va') || pmType.includes('bank') || pmType.includes('transfer');
             const isManualLocal = pmType.includes('manual') || isManual;
 
-            let displayVa = invoice.va_number || 'Tidak tersedia';
-            let displayName = 'Yayasan Peduli Sesama';
-            if (isManualLocal && displayVa.includes('|')) {
-              const parts = displayVa.split('|');
-              displayVa = parts[0];
-              displayName = parts[1];
-            }
+
 
             return isVA || isManualLocal ? (
               <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-gray-300 relative text-left">
@@ -386,29 +397,6 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
            })()}
         </div>
 
-        <div className="flex justify-between items-center mb-4 px-1">
-          <h3 className="font-bold text-gray-800 text-lg">Cara Pembayaran</h3>
-          <button onClick={handleDownloadPDF} disabled={isDownloadingPdf} className="flex items-center gap-1.5 text-teal-600 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
-            {isDownloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            Download PDF
-          </button>
-        </div>
-        
-        <div className="flex flex-col gap-3 mb-6">
-          {invoice.instructions?.map((inst: any, idx: number) => (
-            <details key={idx} className="group bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" open={idx === 0}>
-              <summary className="font-bold text-sm text-gray-800 p-4 cursor-pointer list-none flex justify-between items-center bg-gray-50/50 hover:bg-gray-50 transition-colors select-none">
-                <span className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</span>
-                  {inst.title}
-                </span>
-                <ChevronDown size={18} className="text-gray-400 group-open:rotate-180 transition-transform shrink-0 ml-2" />
-              </summary>
-              <div className="p-4 border-t border-gray-100 bg-white text-sm text-gray-700 leading-relaxed [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-2 [&_strong]:font-bold [&_strong]:text-gray-900" dangerouslySetInnerHTML={{ __html: inst.content }}></div>
-            </details>
-          ))}
-        </div>
-
         {/* Upload Proof Area (Only for Manual Transfer) */}
         {isManual && (
           <div className="bg-white border text-center border-gray-100 rounded-2xl p-6 shadow-sm mb-6">
@@ -452,6 +440,29 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
             )}
           </div>
         )}
+
+        <div className="flex justify-between items-center mb-4 px-1">
+          <h3 className="font-bold text-gray-800 text-lg">Cara Pembayaran</h3>
+          <button onClick={handleDownloadPDF} disabled={isDownloadingPdf} className="flex items-center gap-1.5 text-teal-600 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+            {isDownloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Download PDF
+          </button>
+        </div>
+        
+        <div className="flex flex-col gap-3 mb-6">
+          {invoice.instructions?.map((inst: any, idx: number) => (
+            <details key={idx} className="group bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" open={idx === 0}>
+              <summary className="font-bold text-sm text-gray-800 p-4 cursor-pointer list-none flex justify-between items-center bg-gray-50/50 hover:bg-gray-50 transition-colors select-none">
+                <span className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</span>
+                  {inst.title}
+                </span>
+                <ChevronDown size={18} className="text-gray-400 group-open:rotate-180 transition-transform shrink-0 ml-2" />
+              </summary>
+              <div className="p-4 border-t border-gray-100 bg-white text-sm text-gray-700 leading-relaxed [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-2 [&_strong]:font-bold [&_strong]:text-gray-900" dangerouslySetInnerHTML={{ __html: inst.content }}></div>
+            </details>
+          ))}
+        </div>
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white p-4 border-t border-gray-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] pb-safe z-20">
@@ -518,8 +529,8 @@ export default function InvoiceInteractive({ invoice, invoiceCode }: { invoice: 
           </div>
           <p style={{ fontWeight: '700', fontSize: '15px', marginBottom: '12px' }}>Rincian Donasi</p>
           <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '8px', fontSize: '13px', marginBottom: '20px' }}>
-            <div style={{ color: '#6b7280', fontWeight: '600' }}>{invoice.payment_method_type?.includes('qr') ? 'QRIS String' : 'Kode Pembayaran'}</div>
-            <div style={{ fontWeight: '700' }}>{invoice.va_number || (isManual ? 'Lihat rekening di instruksi' : '-')}</div>
+            <div style={{ color: '#6b7280', fontWeight: '600' }}>{isManual ? 'Nomor Rekening' : invoice.payment_method_type?.includes('qr') ? 'QRIS String' : 'Kode Pembayaran'}</div>
+            <div style={{ fontWeight: '700' }}>{displayVa} {isManual && displayName ? `(a/n ${displayName})` : ''}</div>
             <div style={{ color: '#6b7280', fontWeight: '600' }}>Batas Pembayaran</div>
             <div>{expireDateStr || (invoice.created_at ? new Date(new Date(invoice.created_at).getTime() + 6*60*60*1000).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }) : '-')}</div>
           </div>
